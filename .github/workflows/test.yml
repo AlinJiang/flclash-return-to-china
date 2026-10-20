@@ -47,6 +47,11 @@ jobs:
       - run: node --check override.js
       - name: Build the pinned core and the route probe
         run: |
+          # proxy.golang.org drops a download now and then, and every new Go
+          # patch release starts from an empty module cache.
+          retry() { for _ in 1 2 3; do "$@" && return; sleep 10; done; return 1; }
+          (cd .core/Clash.Meta && retry go mod download)
+          (cd test/route-probe && retry go mod download)
           go build -C .core/Clash.Meta -tags "$CORE_TAGS" -trimpath -o "$RUNNER_TEMP/mihomo" .
           go build -C test/route-probe -tags "$CORE_TAGS" -trimpath -o "$RUNNER_TEMP/route-probe" .
       - name: Fetch GeoIP data once instead of per parse
