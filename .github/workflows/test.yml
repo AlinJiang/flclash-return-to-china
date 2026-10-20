@@ -60,6 +60,8 @@ jobs:
           MIHOMO_BIN: ${{ runner.temp }}/mihomo
           ROUTE_PROBE_BIN: ${{ runner.temp }}/route-probe
           MIHOMO_GEODATA_DIR: ${{ runner.temp }}/geodata
+          # Runs router/compose.yaml in Docker against the real rule lists.
+          ROUTER_E2E: '1'
         run: npm test
       - name: Fetch and check every upstream list
         run: node tools/fetch-upstream.mjs "$RUNNER_TEMP/geosite" "$RUNNER_TEMP/sukka"

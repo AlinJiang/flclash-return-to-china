@@ -13,3 +13,6 @@ node_modules
 *.log
 *.key
 *.secret
+
+# The NAS side router config and compose template are generated or published on purpose.
+!router/*.yaml

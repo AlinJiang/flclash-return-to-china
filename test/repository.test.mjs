@@ -24,6 +24,8 @@ const ALLOWED_HOSTS = [
   /^cp\.cloudflare\.com$/, /^www\.gstatic\.com$/,
   /^github\.com$/, /^raw\.githubusercontent\.com$/,
   /^localhost$/, /^127\.0\.0\.1$/, /^::1$/, /^(192\.0\.2|198\.51\.100|203\.0\.113)\.\d+$/,
+  // Mihomo's wildcard in tun.dns-hijack (tcp://any:53), never a host.
+  /^any$/,
   /(^|\.)invalid$/,
 ];
 const isAllowedHost = (host) => ALLOWED_HOSTS.some((pattern) => pattern.test(host.toLowerCase()));

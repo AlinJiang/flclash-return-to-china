@@ -29,6 +29,10 @@
 - 系统代理模式下，FlClash 默认的“排除域名”里有 `*jd.com`、`*360buyimg.com`、`*zhihu.com`、`*zhimg.com`（[源码](https://github.com/chen08209/FlClash/blob/8d4f9744948751f1273fe871e1d05276fac09b0e/lib/models/config.dart#L13-L31)）。这些网站不经过 FlClash，全局模式也管不到。需要它们回国时，删掉这几项，或改用虚拟网卡模式。
 - 全局模式解决问题后，把那个服务加进 `rules/return.txt`（见下文），再切回“规则”。
 
+## 家里的旁路由
+
+家里的电视、游戏机和没装 FlClash 的设备，可以通过 NAS 上的旁路由使用同一套分流，见 [`router/README.md`](router/README.md)。它的配置 `router/config.yaml` 由 `override.js` 生成，规则和 FlClash 设备完全一样。
+
 ## 名单从哪里来
 
 名单几乎全部来自社区持续维护的规则集，由每台设备上的核心自动下载和更新：
@@ -142,6 +146,7 @@ CI（`.github/workflows/test.yml`）在每个 PR、每次合并和每天定时�
 - 从源码构建 FlClash 0.9.1 固定的核心（带 `with_gvisor` 构建标签），用 `-t` 解析每个测试配置，并用它的规则引擎确认一组连接的出口。
 - 下载当天的全部上游列表，确认每个都存在、非空、能被核心完整加载，再用它们跑一遍路由测试。上游改名、清空或改坏某个列表时会失败，GitHub 会发邮件。上游暂时访问不了时也会失败，过后重跑即可。仓库 60 天没有活动时 GitHub 会暂停定时任务，需要在 Actions 页面重新启用。
 - `rules/` 文件格式；仓库里没有机场地址、凭据、压缩包或数据库文件。
+- `router/config.yaml` 和 `override.js` 一致；用 Docker 把 `router/compose.yaml` 当真实网关跑一遍端到端测试（`test/router-e2e.test.mjs`）。
 
 ## 失败时会发生什么
 
@@ -205,6 +210,7 @@ MIHOMO_BIN=/tmp/mihomo ROUTE_PROBE_BIN=/tmp/route-probe MIHOMO_GEODATA_DIR=/tmp/
 - `rules/`：我们自己维护的三份规则。
 - `test/`：测试。`fixtures/profiles.mjs` 是虚构的机场配置，`route-probe/` 是基于固定核心的路由探针。
 - `tools/check-profile.mjs`：用本地真实配置做离线检查。`tools/fetch-upstream.mjs`：下载并检查脚本用到的全部上游列表。
+- `router/`：NAS 旁路由的生成配置、Container Station 应用配置和部署说明。`tools/build-router-config.mjs`：生成 `router/config.yaml`。
 - `.github/workflows/test.yml`：CI。
 
 ## 致谢和许可
