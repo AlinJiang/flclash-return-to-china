@@ -41,8 +41,8 @@ const OWN_RULES = 'https://raw.githubusercontent.com/AlinJiang/flclash-return-to
 function servedTemplate(suffix = '') {
   const template = fs.readFileSync(path.join(repositoryDirectory, 'router/config.yaml'), 'utf8');
   assert.ok(template.includes(OWN_RULES));
-  // Check the fallback every 5 s instead of 300 s, so recovery shows up in the test.
-  const fast = template.replace(/(- name: 回国或直连\n(?: {4}.*\n)*? {4}interval: )300\n/, '$15\n');
+  // Check the fallback every 5 s instead of 60 s, so recovery shows up in the test.
+  const fast = template.replace(/(- name: 回国或直连\n(?: {4}.*\n)*? {4}interval: )60\n/, '$15\n');
   assert.notEqual(fast, template);
   return `${fast.replaceAll(OWN_RULES, `http://${NET}.10/rules/`)}${suffix}`;
 }
@@ -216,6 +216,15 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
         const { providers } = api('GET', '/providers/rules');
         return expected.every((name) => providers[name]?.ruleCount > 0) && providers['sukka-reject-domainset'].ruleCount > 1000;
       });
+    });
+
+    await t.test('the fallback picks the node once it has checked it', async () => {
+      // At a cold start the fallback checks before the subscription has loaded,
+      // finds 回国节点 empty and uses DIRECT until its next check while in use.
+      await until('the fallback to pick the node', () => {
+        fetchFromClient('v.qq.com');
+        return api('GET', `/proxies/${encodeURIComponent(FALLBACK)}`).now === RETURN;
+      }, 60_000);
     });
 
     await t.test('LAN clients resolve names through the router', () => {

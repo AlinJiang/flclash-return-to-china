@@ -303,9 +303,10 @@ function buildReturnGroup(name, { nodes, providers: providerNames }) {
 /**
  * The group the rules use. While the return group answers its health check it
  * carries the traffic; when every return node is down, DIRECT does, so China
- * apps keep working outside region-locked content. The core probes again on
- * repeated dial failures and on every interval, and returns to the return
- * group once it answers (adapter/outboundgroup/fallback.go). The check URL
+ * apps keep working outside region-locked content. The core probes at start,
+ * on repeated dial failures and every interval while in use, and returns to
+ * the return group once it answers (adapter/outboundgroup/fallback.go,
+ * adapter/provider/healthcheck.go). The check URL
  * also answers from abroad, so DIRECT always counts as alive.
  */
 function buildFallbackGroup(name, returnName) {
@@ -314,7 +315,9 @@ function buildFallbackGroup(name, returnName) {
     type: 'fallback',
     proxies: [returnName, 'DIRECT'],
     ...HEALTH_CHECK,
-    interval: 300,
+    // One failed check, such as the first one at a cold start before the
+    // subscription has loaded, sends return traffic DIRECT until the next.
+    interval: 60,
     lazy: true,
     hidden: true,
   };

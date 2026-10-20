@@ -78,7 +78,7 @@ proxy-groups:
       - DIRECT
     url: https://wifi.vivo.com.cn/generate_204
     expected-status: "204"
-    interval: 300
+    interval: 60
     lazy: true
     hidden: true
   - name: GLOBAL

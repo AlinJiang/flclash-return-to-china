@@ -104,7 +104,7 @@ const OWN_FALLBACK = {
   proxies: [RETURN, 'DIRECT'],
   url: HEALTH_URL,
   'expected-status': '204',
-  interval: 300,
+  interval: 60,
   lazy: true,
   hidden: true,
 };

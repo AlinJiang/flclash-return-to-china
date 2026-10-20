@@ -82,7 +82,7 @@
 - **前提：机场的节点都从中国大陆出口**，也就是纯回国机场。混着香港、日本节点的普通机场不适用。
 - 链式代理的前置跳板（节点 `dialer-proxy` 指向的节点或组）不进组：跳板组列出的节点、它 `use` 的 provider 都按跳板处理。provider 自己或它的 `override` 带 `dialer-proxy` 时，它的节点全部是出口。脚本不计算跳板组的 `filter`；跳板组用 `include-all-proxies` 时所有内联节点都按跳板处理，若因此一个出口都不剩，就把全部节点放回来。这时组里可能混进中转节点，用 `tools/check-profile.mjs` 可以看核心实际给出的成员。
 - 订阅过期、只剩公告节点时，组里只剩 `DIRECT`，必须回国的服务暂时直连。
-- 规则实际指向隐藏的 `回国或直连`（`fallback` 类型，成员是 `回国节点` 和 `DIRECT`）：`回国节点` 通过健康检查时用它，整组都不通时用 `DIRECT`。连续几次连接失败会立刻触发一次检查，平时每 300 秒检查一次，节点恢复后自动切回（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/adapter/outboundgroup/fallback.go)）。检测地址从海外直连也能访问，所以 `DIRECT` 总是可用的退路。它在代理页面和 FlClash 的规则模式下都不显示。
+- 规则实际指向隐藏的 `回国或直连`（`fallback` 类型，成员是 `回国节点` 和 `DIRECT`）：`回国节点` 通过健康检查时用它，整组都不通时用 `DIRECT`。启动时和连续几次连接失败时会立刻检查，使用中每 60 秒检查一次，节点恢复后自动切回（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/adapter/outboundgroup/fallback.go)）。检测地址从海外直连也能访问，所以 `DIRECT` 总是可用的退路。它在代理页面和 FlClash 的规则模式下都不显示。
 - 机场原有的组全部保留但隐藏：节点的 `dialer-proxy`、`tunnels`、DNS 的 `#组名` 可能引用它们，缺失会让核心拒绝整份配置（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/config/utils.go#L148-L176)）。DNS 和 sniffer 引用的机场规则集也会保留。
 - 机场已有同名的节点或组时，脚本的组自动加后缀，例如 `回国节点 2`。机场配置自带 select 类型的 `GLOBAL` 时，脚本不另建，而是把 `回国节点` 放进它的第一位。
 
