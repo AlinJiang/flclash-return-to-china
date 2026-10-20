@@ -31,6 +31,7 @@ const WAN = '203.0.113';
 const ROUTER = `${NET}.2`;
 const SECRET = 'test-only-secret';
 const RETURN = '回国节点';
+const FALLBACK = '回国或直连';
 const NODE = '上海 01';
 const NOTICE = '剩余流量：100 GB';
 const ROUTER_IMAGE = YAML.parse(fs.readFileSync(composeFile, 'utf8')).services.mihomo.image;
@@ -40,7 +41,10 @@ const OWN_RULES = 'https://raw.githubusercontent.com/AlinJiang/flclash-return-to
 function servedTemplate(suffix = '') {
   const template = fs.readFileSync(path.join(repositoryDirectory, 'router/config.yaml'), 'utf8');
   assert.ok(template.includes(OWN_RULES));
-  return `${template.replaceAll(OWN_RULES, `http://${NET}.10/rules/`)}${suffix}`;
+  // Check the fallback every 5 s instead of 300 s, so recovery shows up in the test.
+  const fast = template.replace(/(- name: 回国或直连\n(?: {4}.*\n)*? {4}interval: )300\n/, '$15\n');
+  assert.notEqual(fast, template);
+  return `${fast.replaceAll(OWN_RULES, `http://${NET}.10/rules/`)}${suffix}`;
 }
 
 function run(command, args, { input, allowFailure = false, timeout = 300_000 } = {}) {
@@ -270,6 +274,27 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       // Without the rule the reply enters the TUN and is lost.
       run('docker', ['exec', `${PROJECT}-mihomo-1`, 'ip', 'rule', 'del', 'priority', '8000']);
       assert.notEqual(fromOutside().status, 0, 'the reply must need the DIRECT_REPLIES rule');
+    });
+
+    await t.test('with the airport down return traffic goes direct, and back to the node once it answers', async () => {
+      const now = () => api('GET', `/proxies/${encodeURIComponent(FALLBACK)}`).now;
+      const viaNode = () => (airportLog().match(/v\.qq\.com:443/g) ?? []).length;
+      assert.equal(now(), RETURN);
+      compose('stop', 'airport');
+      await until('the switch to DIRECT', () => {
+        fetchFromClient('v.qq.com');
+        return now() === 'DIRECT';
+      }, 120_000);
+      const direct = fetchFromClient('v.qq.com');
+      assert.equal(direct.status, 0, `China apps keep working while the airport is down:\n${direct.output}`);
+      compose('start', 'airport');
+      await until('the switch back to the node', () => {
+        fetchFromClient('v.qq.com');
+        return now() === RETURN;
+      }, 120_000);
+      const before = viaNode();
+      assert.equal(fetchFromClient('v.qq.com').status, 0);
+      await until('the request through the node', () => viaNode() > before, 30_000);
     });
 
     await t.test('a template that does not parse is ignored', async () => {

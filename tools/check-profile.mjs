@@ -78,11 +78,11 @@ check(changed.length === 0, `non-routing root keys unchanged (${retainedKeys.len
 const groups = output['proxy-groups'];
 const degraded = groups[0]?.name?.startsWith('⚠️');
 check(!degraded, 'script built the return policy (no degraded fallback)');
-for (const group of groups.slice(0, 1)) {
+for (const group of groups.slice(0, 2)) {
   const members = [...(group.proxies ?? []), ...(group.use ?? []).map((name) => `use:${name}`)];
   console.log(`     group ${group.name} (${group.type}${group.hidden ? ', hidden' : ''}): ${members.map(mask).join(' | ')}`);
 }
-// Everything after our group is the airport's, plus our hidden GLOBAL.
+// After 回国节点 come our hidden fallback and GLOBAL, then the airport's groups, all hidden.
 check(degraded || groups.slice(1).every((group) => group.hidden === true), `${(input['proxy-groups'] ?? []).length} airport groups kept and hidden`);
 console.log(`     rule-providers: ${Object.keys(output['rule-providers'] ?? {}).map(mask).join(', ')}`);
 // Rules come from the script's own constants and SETTINGS, never from the airport.
@@ -110,15 +110,16 @@ if (!probeBinary) {
 } else if (degraded || !coreParsed) {
   console.log('skip routing probe (the output must build and parse first)');
 } else {
-  const returnGroup = groups[0].name;
+  // Rules target the fallback (groups[1]); it uses 回国节点 (groups[0]) while that answers.
+  const [returnGroup, ruleTarget] = groups.map((group) => group.name);
   const cases = [
-    ['tcp', 'api.bilibili.com', 443, returnGroup],
+    ['tcp', 'api.bilibili.com', 443, ruleTarget],
     ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, 'DIRECT'],
-    ['tcp', 'interface3.music.163.com', 443, returnGroup],
-    ['tcp', 'www.taobao.com', 443, returnGroup],
+    ['tcp', 'interface3.music.163.com', 443, ruleTarget],
+    ['tcp', 'www.taobao.com', 443, ruleTarget],
     ['tcp', 'amdc.m.taobao.com', 443, 'REJECT'],
-    ['tcp', 'vd6.l.qq.com', 443, returnGroup],
-    ['tcp', 'www.icbc.com.cn', 443, returnGroup],
+    ['tcp', 'vd6.l.qq.com', 443, ruleTarget],
+    ['tcp', 'www.icbc.com.cn', 443, ruleTarget],
     ['tcp', 'www.baidu.com', 443, 'DIRECT'],
     ['tcp', 'weixin.qq.com', 443, 'DIRECT'],
     ['tcp', 'wetype.weixin.qq.com', 443, 'DIRECT'],
@@ -129,7 +130,7 @@ if (!probeBinary) {
     // The airport's own providers stay as they are: they only serve its DNS and
     // sniffer, and route-probe never loads an http provider.
     const airportProviders = Object.keys(input['rule-providers'] ?? {});
-    const result = probe(output, cases, [returnGroup, 'GLOBAL'], {}, airportProviders);
+    const result = probe(output, cases, [returnGroup, ruleTarget, 'GLOBAL'], {}, airportProviders);
     cases.forEach(([network, host, port, expected], index) => {
       const actual = result.cases[index];
       check(actual.outbound === expected && actual.resolutions === 0,

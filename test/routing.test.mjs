@@ -25,32 +25,32 @@ function assertRoutes(config, cases, select = {}) {
 // The first url-test member of the subconverter profile is an SSR node without UDP.
 const ROUTES = [
   // Copyright checks sit on these pages and APIs.
-  ['tcp', 'api.bilibili.com', 443, '回国节点'],
-  ['tcp', 'www.iqiyi.com', 443, '回国节点'],
-  ['tcp', 'www.mgtv.com', 443, '回国节点'],
-  ['tcp', 'u.y.qq.com', 443, '回国节点'],
-  ['tcp', 'interface3.music.163.com', 443, '回国节点'],
-  ['tcp', 'interface3.music.163.com.163jiasu.com', 443, '回国节点'],
-  ['tcp', 'v.qq.com', 443, '回国节点'],
-  ['tcp', 'h5vv6.video.qq.com', 443, '回国节点'],
+  ['tcp', 'api.bilibili.com', 443, '回国或直连'],
+  ['tcp', 'www.iqiyi.com', 443, '回国或直连'],
+  ['tcp', 'www.mgtv.com', 443, '回国或直连'],
+  ['tcp', 'u.y.qq.com', 443, '回国或直连'],
+  ['tcp', 'interface3.music.163.com', 443, '回国或直连'],
+  ['tcp', 'interface3.music.163.com.163jiasu.com', 443, '回国或直连'],
+  ['tcp', 'v.qq.com', 443, '回国或直连'],
+  ['tcp', 'h5vv6.video.qq.com', 443, '回国或直连'],
   // Tencent Video's playback-info hosts are in Sukka reject; unblock.txt lets them through.
-  ['tcp', 'vd.l.qq.com', 443, '回国节点'],
-  ['tcp', 'vd6.l.qq.com', 443, '回国节点'],
-  ['tcp', 'vi.l.qq.com', 443, '回国节点'],
+  ['tcp', 'vd.l.qq.com', 443, '回国或直连'],
+  ['tcp', 'vd6.l.qq.com', 443, '回国或直连'],
+  ['tcp', 'vi.l.qq.com', 443, '回国或直连'],
   // Needs a China IP for other reasons.
-  ['tcp', 'h5api.m.taobao.com', 443, '回国节点'],
-  ['tcp', 'www.zj.gov.cn', 443, '回国节点'],
-  ['tcp', 'www.icbc.com.cn', 443, '回国节点'],
-  ['tcp', 'www.abchina.com', 443, '回国节点'],
-  ['tcp', 'pbank.95559.com.cn', 443, '回国节点'],
-  ['tcp', 'bank.pingan.com', 443, '回国节点'],
-  ['tcp', 'www.czbank.com', 443, '回国节点'],
-  ['tcp', 'ebank.abchina.com.cn', 443, '回国节点'],
-  ['tcp', 'auth.orangebank.com.cn', 443, '回国节点'],
+  ['tcp', 'h5api.m.taobao.com', 443, '回国或直连'],
+  ['tcp', 'www.zj.gov.cn', 443, '回国或直连'],
+  ['tcp', 'www.icbc.com.cn', 443, '回国或直连'],
+  ['tcp', 'www.abchina.com', 443, '回国或直连'],
+  ['tcp', 'pbank.95559.com.cn', 443, '回国或直连'],
+  ['tcp', 'bank.pingan.com', 443, '回国或直连'],
+  ['tcp', 'www.czbank.com', 443, '回国或直连'],
+  ['tcp', 'ebank.abchina.com.cn', 443, '回国或直连'],
+  ['tcp', 'auth.orangebank.com.cn', 443, '回国或直连'],
   // bankofchina.com mirrors boc.cn for mainland banking; it is no overseas company.
-  ['tcp', 'netc1.igtb.bankofchina.com', 443, '回国节点'],
-  ['tcp', 'www.10086.cn', 443, '回国节点'],
-  ['tcp', '59.111.160.195', 443, '回国节点'],
+  ['tcp', 'netc1.igtb.bankofchina.com', 443, '回国或直连'],
+  ['tcp', 'www.10086.cn', 443, '回国或直连'],
+  ['tcp', '59.111.160.195', 443, '回国或直连'],
   // Media CDNs serve overseas clients.
   ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, 'DIRECT'],
   ['tcp', 'i0.hdslb.com', 443, 'DIRECT'],
@@ -95,7 +95,7 @@ const ROUTES = [
   ['udp', 'www.google.com', 443, 'DIRECT'],
 ];
 
-test('only China-IP services go to 回国节点; ads rejected; everything else local; no DNS lookups', { skip: unavailable }, () => {
+test('only China-IP services go to 回国或直连 (回国节点, else DIRECT); ads rejected; everything else local; no DNS lookups', { skip: unavailable }, () => {
   assertRoutes(runInNode(PROFILES.subconverter()).output, ROUTES);
 });
 
@@ -120,7 +120,7 @@ test('QUIC for a return.txt line that a later DIRECT list also holds is rejected
   const output = runInNode(PROFILES.subconverter()).output;
   output['rule-providers']['own-return'] = { type: 'inline', behavior: 'classical', payload: ['DOMAIN-SUFFIX,bilivideo.com'] };
   assertRoutes(output, [
-    ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, '回国节点'],
+    ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, '回国或直连'],
     ['udp', 'upos-sz-mirrorcos.bilivideo.com', 443, 'REJECT'],
     ['udp', 'upos-sz-mirrorcos.bilivideo.com', 8000, 'DIRECT'],
   ]);
@@ -130,7 +130,7 @@ test('with a UDP-capable node pinned, China UDP and QUIC go home', { skip: unava
   // The trojan node carries UDP; pinning it is what a tap in FlClash does.
   const output = runInNode(PROFILES.subconverter()).output;
   assertRoutes(output, [
-    ['udp', 'api.bilibili.com', 443, '回国节点'],
+    ['udp', 'api.bilibili.com', 443, '回国或直连'],
     ['udp', 'www.google.com', 443, 'DIRECT'],
   ], { 回国节点: '港沪专线_回国' });
 });
@@ -139,29 +139,31 @@ test('without ad blocking, ad domains follow the normal routes', { skip: unavail
   const source = scriptSource.replace('blockAds: true,', 'blockAds: false,');
   assertRoutes(runInNode(PROFILES.subconverter(), source).output, [
     ['tcp', 'stats.doubleclick-cn.net', 443, 'DIRECT'],
-    ['tcp', 'afp.iqiyi.com', 443, '回国节点'],
-    ['tcp', 'api.bilibili.com', 443, '回国节点'],
+    ['tcp', 'afp.iqiyi.com', 443, '回国或直连'],
+    ['tcp', 'api.bilibili.com', 443, '回国或直连'],
   ]);
 });
 
 test('routing media CDNs home sends Bilibili video and NetEase audio home', { skip: unavailable }, () => {
   const source = scriptSource.replace('mediaCdnViaReturn: false,', 'mediaCdnViaReturn: true,');
   assertRoutes(runInNode(PROFILES.subconverter(), source).output, [
-    ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, '回国节点'],
-    ['tcp', 'm801.music.126.net', 443, '回国节点'],
+    ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, '回国或直连'],
+    ['tcp', 'm801.music.126.net', 443, '回国或直连'],
     ['tcp', 'www.bilibili.tv', 443, 'DIRECT'],
   ]);
 });
 
-test('every profile routes China-IP services to its return group', { skip: unavailable }, () => {
+test('every profile routes China-IP services to its fallback over its return group', { skip: unavailable }, () => {
   for (const [name, profile] of Object.entries(PROFILES)) {
     const output = runInNode(profile()).output;
-    const returnGroup = output['proxy-groups'][0].name;
+    const [returnGroup, fallback] = output['proxy-groups'].map((group) => group.name);
     assertRoutes(output, [
-      ['tcp', 'api.bilibili.com', 443, returnGroup],
+      ['tcp', 'api.bilibili.com', 443, fallback],
       ['tcp', 'www.google.com', 443, 'DIRECT'],
     ]);
-    assert.ok(returnGroup.startsWith('回国节点'), name);
+    assert.ok(returnGroup.startsWith('回国节点') && fallback.startsWith('回国或直连'), name);
+    // The core sees the fallback as the return group first, then DIRECT.
+    assert.deepEqual(probe(output, [], [fallback]).members[fallback], [returnGroup, 'DIRECT'], name);
   }
 });
 
