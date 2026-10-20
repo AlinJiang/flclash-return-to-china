@@ -1,0 +1,73 @@
+name: Test policy bundle
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # Devices download the community lists themselves. A renamed, emptied or
+  # reshaped upstream file would leave its rule silently empty everywhere, so
+  # every run, and a daily one, also routes through today's lists.
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The Mihomo fork FlClash v0.9.1 pins as its core/Clash.Meta submodule.
+  CORE_REPOSITORY: chen08209/Clash.Meta
+  CORE_COMMIT: 8380d0e7462f061a964323e9bf3129a236fcc5d5
+  # FlClash/build_config.yaml; without it the core rejects tailscale and gVisor WireGuard nodes.
+  CORE_TAGS: with_gvisor
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.CORE_REPOSITORY }}
+          ref: ${{ env.CORE_COMMIT }}
+          path: .core/Clash.Meta
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+          cache-dependency-path: test/route-probe/go.sum
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --check override.js
+      - name: Build the pinned core and the route probe
+        run: |
+          go build -C .core/Clash.Meta -tags "$CORE_TAGS" -trimpath -o "$RUNNER_TEMP/mihomo" .
+          go build -C test/route-probe -tags "$CORE_TAGS" -trimpath -o "$RUNNER_TEMP/route-probe" .
+      - name: Fetch GeoIP data once instead of per parse
+        run: |
+          mkdir -p "$RUNNER_TEMP/geodata"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$RUNNER_TEMP/geodata/geoip.metadb" \
+            https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb
+      - name: Test
+        env:
+          MIHOMO_BIN: ${{ runner.temp }}/mihomo
+          ROUTE_PROBE_BIN: ${{ runner.temp }}/route-probe
+          MIHOMO_GEODATA_DIR: ${{ runner.temp }}/geodata
+        run: npm test
+      - name: Fetch and check every upstream list
+        run: node tools/fetch-upstream.mjs "$RUNNER_TEMP/geosite" "$RUNNER_TEMP/sukka"
+      - name: Route the test connections through today's lists
+        env:
+          MIHOMO_BIN: ${{ runner.temp }}/mihomo
+          ROUTE_PROBE_BIN: ${{ runner.temp }}/route-probe
+          MIHOMO_GEODATA_DIR: ${{ runner.temp }}/geodata
+          GEOSITE_MRS_DIR: ${{ runner.temp }}/geosite
+          SUKKA_ARTIFACTS_DIR: ${{ runner.temp }}/sukka
+        run: node --test test/routing.test.mjs

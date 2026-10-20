@@ -1,0 +1,25 @@
+# 直连的例外：排在去广告之后、所有社区名单之前，用来把回国名单里不需要中国 IP 的部分拿出来。
+# 每行一条 Mihomo 规则，不写目标。被去广告误拦的域名请加到 unblock.txt。
+
+# 微信输入法：海外可以直接用，直连延迟更低。
+DOMAIN,wetype.weixin.qq.com
+
+# 微信视频号、朋友圈视频：海外可以直接看，不应被 return.txt 的 video.qq.com 带去回国。
+DOMAIN-SUFFIX,finder.video.qq.com
+DOMAIN-SUFFIX,findermp.video.qq.com
+DOMAIN-WILDCARD,*wxsns.video.qq.com
+
+# 银行、运营商的海外公司：v2fly 没有标 @!cn，不需要中国 IP。
+DOMAIN-SUFFIX,hk.chinamobile.com
+DOMAIN-SUFFIX,cmi.chinamobile.com
+DOMAIN-SUFFIX,chinamobileltd.com
+DOMAIN-SUFFIX,bocgins.com
+DOMAIN-SUFFIX,clsa.com
+DOMAIN-SUFFIX,citiccapital.com
+DOMAIN-SUFFIX,icbcstandard.com
+DOMAIN-SUFFIX,icbcstandardbank.com
+DOMAIN-SUFFIX,icbcstandardsecurities.com
+DOMAIN-SUFFIX,icbcstandardresources.com
+DOMAIN-SUFFIX,bocaviation.com
+DOMAIN-SUFFIX,bocigroup.com
+DOMAIN-SUFFIX,bocgi.com

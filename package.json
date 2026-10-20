@@ -1,0 +1,21 @@
+{
+  "name": "flclash-return-to-china",
+  "version": "3.0.0",
+  "private": true,
+  "description": "FlClash override script: only services that need a mainland China IP go through return-to-China nodes, everything else DIRECT, ads blocked, one-tap 国内服务 switch",
+  "type": "module",
+  "engines": {
+    "node": ">=22.15"
+  },
+  "scripts": {
+    "check": "node --check override.js",
+    "test": "node --test \"test/*.test.mjs\"",
+    "check-profile": "node tools/check-profile.mjs",
+    "fetch-upstream": "node tools/fetch-upstream.mjs"
+  },
+  "devDependencies": {
+    "@jitl/quickjs-ng-wasmfile-release-sync": "0.32.0",
+    "quickjs-emscripten-core": "0.32.0",
+    "yaml": "2.9.1"
+  }
+}

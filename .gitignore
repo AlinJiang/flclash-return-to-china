@@ -1,0 +1,15 @@
+# No trailing slash: these may be symlinks locally.
+node_modules
+# CI checks out the pinned core here.
+.core
+.DS_Store
+# Never commit a local airport Profile, a FlClash backup (zip with
+# database.sqlite), a FlClash log export or a key.
+*.yaml
+*.zip
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+*.key
+*.secret

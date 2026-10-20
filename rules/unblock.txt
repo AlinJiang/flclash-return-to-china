@@ -1,0 +1,7 @@
+# 被去广告误拦的域名：广告规则跳过这里的域名，它们改按其余规则分流（直连、回国或国内服务）。
+# 每行一条 Mihomo 规则，不写目标。尽量写完整域名（DOMAIN），后缀会连同其下的广告一起放行。
+
+# 腾讯视频的播放信息接口（proxyhttp）：Sukka 把它们列进了 reject，拦掉后无法播放。
+DOMAIN,vd.l.qq.com
+DOMAIN,vd6.l.qq.com
+DOMAIN,vi.l.qq.com

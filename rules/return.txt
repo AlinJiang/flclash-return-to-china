@@ -1,0 +1,44 @@
+# 走回国的补充规则：社区没有合适列表的服务，以及你自己的需要。
+# 每行一条 Mihomo 规则，不写目标；排在去广告之后、所有社区名单之前，被拦的广告不会因此放行。
+# IP 规则（IP-CIDR、IP-CIDR6）只匹配直接按 IP 发起的连接，不触发 DNS 解析。
+
+# 腾讯视频：v2fly 只有覆盖整个腾讯的列表，会把微信、QQ 一起带上。视频号等微信视频见 direct.txt。
+DOMAIN-SUFFIX,v.qq.com
+DOMAIN-SUFFIX,video.qq.com
+DOMAIN,vd.l.qq.com
+DOMAIN,vd6.l.qq.com
+DOMAIN,vi.l.qq.com
+
+# 网易云音乐：客户端也经 163jiasu 别名调用接口。Sukka 在 Surge 里靠 USER-AGENT 规则覆盖，Clash 版没有这条。
+DOMAIN-SUFFIX,music.163.com.163jiasu.com
+
+# 淘宝、天猫：v2fly alibaba 列表里的淘宝天猫条目。整个 alibaba 列表还包含阿里云、钉钉、高德等。
+DOMAIN-SUFFIX,taobao.com
+DOMAIN-SUFFIX,taobao.net
+DOMAIN-SUFFIX,taobao.org
+DOMAIN-SUFFIX,tmall.com
+DOMAIN-SUFFIX,tb.cn
+DOMAIN-SUFFIX,taobao
+DOMAIN-SUFFIX,tmall
+
+# 政务网站：v2fly geolocation-cn 与 tld-cn 里的政务条目（xn--zfr164b 是 .政务）。
+DOMAIN-SUFFIX,gov.cn
+DOMAIN-SUFFIX,mil.cn
+DOMAIN-SUFFIX,xn--zfr164b
+DOMAIN-SUFFIX,12315.cn
+DOMAIN-SUFFIX,12321.cn
+DOMAIN-SUFFIX,12371.cn
+DOMAIN-SUFFIX,12377.cn
+
+# 银行：v2fly 银行名单缺的全国性银行。城商行、农商行按需加在这里。
+# 交通银行网银和手机银行、农业银行 95599（取自 blackmatrix7 BOCOM、ABC 列表）和 abchina.com.cn 网银，
+# 平安银行企业网银（orangebank.com.cn、ebank.sdb.com.cn），浙商、恒丰、渤海银行。
+DOMAIN-SUFFIX,95559.com.cn
+DOMAIN-SUFFIX,95559.sh.cn
+DOMAIN-SUFFIX,95599.cn
+DOMAIN-SUFFIX,abchina.com.cn
+DOMAIN-SUFFIX,orangebank.com.cn
+DOMAIN,ebank.sdb.com.cn
+DOMAIN-SUFFIX,czbank.com
+DOMAIN-SUFFIX,hfbank.com.cn
+DOMAIN-SUFFIX,cbhb.com.cn
