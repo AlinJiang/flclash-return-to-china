@@ -17,7 +17,7 @@ services:
       # Compose expands $ even inside quotes: write each $ as $$, and a ' as ''.
       # The airport subscription link, exactly as in FlClash.
       SUBSCRIPTION_URL: '<airport subscription URL>'
-      # Password for the dashboard at 192.168.50.2:9090/ui: use the output of
+      # Password for the dashboard at 192.168.50.30:9090/ui: use the output of
       # `openssl rand -hex 16`.
       CONTROLLER_SECRET: '<dashboard password>'
       # The LAN router: DNS for everything Mihomo resolves.
@@ -34,9 +34,9 @@ services:
       - mihomo-data:/root/.config/mihomo
     networks:
       lan:
-        ipv4_address: 192.168.50.2
-    # Matches the DHCP reservation that keeps 192.168.50.2 free on the router.
-    mac_address: 02:42:c0:a8:32:02
+        ipv4_address: 192.168.50.30
+    # Matches the DHCP reservation that keeps 192.168.50.30 free on the router.
+    mac_address: 02:42:c0:a8:32:1e
     entrypoint: [/bin/sh, -c]
     # $$ is a literal $ for the shell; Compose would expand a single one.
     command:
@@ -78,4 +78,4 @@ networks:
       config:
         - subnet: 192.168.50.0/24
           gateway: 192.168.50.1
-          ip_range: 192.168.50.2/32
+          ip_range: 192.168.50.30/32
