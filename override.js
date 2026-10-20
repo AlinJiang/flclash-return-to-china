@@ -5,6 +5,7 @@
  * 本脚本保留机场的节点、proxy-providers、DNS、hosts、sniffer、NTP 和其他根配置，
  * 只接管路由：只有必须用中国大陆 IP 的服务（影音版权、淘宝、政务、银行、运营商）
  * 走「回国节点」，其余流量（包括海外能正常用的国内服务）直连，并去广告。
+ * 回国节点全部不可用时，这些服务自动改走直连，节点恢复后自动切回。
  * 应急用 FlClash 自己的出站模式：「全局」让所有流量回国，「直连」让所有流量直连。
  *
  * 名单几乎全部来自社区持续维护的规则集，由每台设备的核心按间隔自动更新：
@@ -32,10 +33,12 @@ const SETTINGS = {
   mediaCdnViaReturn: false,
 };
 
-const SCRIPT_VERSION = '3.0.0';
+const SCRIPT_VERSION = '3.1.0';
 
 // FlClash 按组名记住手动选择，不要随意改名。
 const RETURN_GROUP = '回国节点';
+// 规则指向的隐藏组：回国节点能用就走它，整组都挂了改走直连，恢复后自动切回。
+const FALLBACK_GROUP = '回国或直连';
 const DEGRADED_GROUP = '⚠️ 回国脚本异常';
 
 // Return nodes exit inside mainland China, so a foreign endpoint would measure a
@@ -273,9 +276,9 @@ function referencedRuleProviders(config) {
 }
 
 /**
- * The one group the rules use. url-test picks the fastest return node; tapping
- * a node in FlClash pins it, and the core leaves a pinned node only while it
- * is down (adapter/outboundgroup/urltest.go).
+ * The one group users see. url-test picks the fastest return node; tapping a
+ * node in FlClash pins it, and the core leaves a pinned node only while it is
+ * down (adapter/outboundgroup/urltest.go).
  */
 function buildReturnGroup(name, { nodes, providers: providerNames }) {
   // An expired subscription can leave no nodes at all. url-test needs a member
@@ -298,8 +301,31 @@ function buildReturnGroup(name, { nodes, providers: providerNames }) {
 }
 
 /**
+ * The group the rules use. While the return group answers its health check it
+ * carries the traffic; when every return node is down, DIRECT does, so China
+ * apps keep working outside region-locked content. The core probes at start,
+ * on repeated dial failures and every interval while in use, and returns to
+ * the return group once it answers (adapter/outboundgroup/fallback.go,
+ * adapter/provider/healthcheck.go). The check URL
+ * also answers from abroad, so DIRECT always counts as alive.
+ */
+function buildFallbackGroup(name, returnName) {
+  return {
+    name,
+    type: 'fallback',
+    proxies: [returnName, 'DIRECT'],
+    ...HEALTH_CHECK,
+    // While in use, return traffic is back on 回国节点 within a minute of the
+    // airport recovering.
+    interval: 60,
+    lazy: true,
+    hidden: true,
+  };
+}
+
+/**
  * The routing plan in rule order. Each step is one rule-provider and the rule
- * that uses it: [name, provider, target]. RETURN stands for the 回国节点 group
+ * that uses it: [name, provider, target]. RETURN stands for the 回国或直连 group
  * name, resolved after collision handling. UNBLOCK marks the set the ad rules
  * skip; it has no rule of its own.
  */
@@ -447,6 +473,7 @@ function buildProfile(config) {
     ...providerNames,
   ]);
   const returnName = uniqueName(RETURN_GROUP, takenGroupNames, ' ');
+  const fallbackName = uniqueName(FALLBACK_GROUP, takenGroupNames, ' ');
 
   const keptRuleProviders = referencedRuleProviders(config);
   const takenProviderNames = new Set([...Object.keys(keptRuleProviders), ...providerNames]);
@@ -459,6 +486,7 @@ function buildProfile(config) {
   }
 
   const returnGroup = buildReturnGroup(returnName, members);
+  const fallbackGroup = buildFallbackGroup(fallbackName, returnName);
   const output = { ...config };
   delete output['sub-rules'];
   // Airport groups stay because dialer-proxy, DNS "#group", tunnels and remote
@@ -466,11 +494,11 @@ function buildProfile(config) {
   // are hidden from the Rule-mode proxies page.
   const keptGroups = airportGroups.map((group) => (isObject(group) ? { ...group, hidden: true } : group));
   const proxyNames = new Set([...inlineProxies(config).map((proxy) => proxy.name), ...providerNames]);
-  const groups = [returnGroup, ...withGlobal(keptGroups, returnName, proxyNames)];
+  const groups = [returnGroup, fallbackGroup, ...withGlobal(keptGroups, returnName, proxyNames)];
   output['proxy-groups'] = groups;
   output['rule-providers'] = ruleProviders;
-  output.rules = buildRules(plan, ourProviderNames, returnName);
-  assertResolvable(output, groups.filter((group) => group === returnGroup || group?.name === 'GLOBAL'));
+  output.rules = buildRules(plan, ourProviderNames, fallbackName);
+  assertResolvable(output, groups.filter((group) => group === returnGroup || group === fallbackGroup || group?.name === 'GLOBAL'));
 
   console.log(
     `[return-to-china ${SCRIPT_VERSION}] ${members.nodes.length} nodes, ${members.providers.length} proxy providers, `

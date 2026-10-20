@@ -71,6 +71,16 @@ proxy-groups:
     lazy: true
     exclude-filter: (?i)官网|网址|地址|剩余|已用|总流量|到期|过期|有效期|重置|套餐|订阅|群|频道|客服|公告|traffic|expire|website|https?://
     exclude-type: Direct|Dns|Reject|RejectDrop|Rematch
+  - name: 回国或直连
+    type: fallback
+    proxies:
+      - 回国节点
+      - DIRECT
+    url: https://wifi.vivo.com.cn/generate_204
+    expected-status: "204"
+    interval: 60
+    lazy: true
+    hidden: true
   - name: GLOBAL
     type: select
     hidden: true
@@ -404,7 +414,7 @@ rules:
   - AND,((RULE-SET,geosite-tencent-tme-ads,no-resolve),(NOT,((RULE-SET,own-unblock,no-resolve)))),REJECT
   - AND,((RULE-SET,geosite-cctv-ads,no-resolve),(NOT,((RULE-SET,own-unblock,no-resolve)))),REJECT
   - RULE-SET,own-direct,DIRECT,no-resolve
-  - RULE-SET,own-return,回国节点,no-resolve
+  - RULE-SET,own-return,回国或直连,no-resolve
   - AND,((NETWORK,UDP),(DST-PORT,443),(OR,((RULE-SET,own-return,no-resolve)))),REJECT
   - RULE-SET,geosite-bilibili-overseas,DIRECT,no-resolve
   - RULE-SET,geosite-iqiyi-overseas,DIRECT,no-resolve
@@ -420,24 +430,24 @@ rules:
   - RULE-SET,geosite-chinaunicom-overseas,DIRECT,no-resolve
   - RULE-SET,sukka-domestic-cdn,DIRECT,no-resolve
   - RULE-SET,geosite-bilibili-cdn,DIRECT,no-resolve
-  - RULE-SET,geosite-bilibili,回国节点,no-resolve
-  - RULE-SET,geosite-iqiyi,回国节点,no-resolve
-  - RULE-SET,geosite-youku,回国节点,no-resolve
-  - RULE-SET,geosite-hunantv,回国节点,no-resolve
-  - RULE-SET,geosite-cctv,回国节点,no-resolve
-  - RULE-SET,geosite-tencent-tme,回国节点,no-resolve
-  - RULE-SET,sukka-neteasemusic,回国节点,no-resolve
-  - RULE-SET,geosite-icbc,回国节点,no-resolve
-  - RULE-SET,geosite-boc,回国节点,no-resolve
-  - RULE-SET,geosite-ccb,回国节点,no-resolve
-  - RULE-SET,geosite-cmb,回国节点,no-resolve
-  - RULE-SET,geosite-citic,回国节点,no-resolve
-  - RULE-SET,geosite-pingan,回国节点,no-resolve
-  - RULE-SET,geosite-unionpay,回国节点,no-resolve
-  - RULE-SET,geosite-category-bank-cn,回国节点,no-resolve
-  - RULE-SET,geosite-chinamobile,回国节点,no-resolve
-  - RULE-SET,geosite-chinatelecom,回国节点,no-resolve
-  - RULE-SET,geosite-chinaunicom,回国节点,no-resolve
-  - RULE-SET,sukka-neteasemusic-ip,回国节点,no-resolve
+  - RULE-SET,geosite-bilibili,回国或直连,no-resolve
+  - RULE-SET,geosite-iqiyi,回国或直连,no-resolve
+  - RULE-SET,geosite-youku,回国或直连,no-resolve
+  - RULE-SET,geosite-hunantv,回国或直连,no-resolve
+  - RULE-SET,geosite-cctv,回国或直连,no-resolve
+  - RULE-SET,geosite-tencent-tme,回国或直连,no-resolve
+  - RULE-SET,sukka-neteasemusic,回国或直连,no-resolve
+  - RULE-SET,geosite-icbc,回国或直连,no-resolve
+  - RULE-SET,geosite-boc,回国或直连,no-resolve
+  - RULE-SET,geosite-ccb,回国或直连,no-resolve
+  - RULE-SET,geosite-cmb,回国或直连,no-resolve
+  - RULE-SET,geosite-citic,回国或直连,no-resolve
+  - RULE-SET,geosite-pingan,回国或直连,no-resolve
+  - RULE-SET,geosite-unionpay,回国或直连,no-resolve
+  - RULE-SET,geosite-category-bank-cn,回国或直连,no-resolve
+  - RULE-SET,geosite-chinamobile,回国或直连,no-resolve
+  - RULE-SET,geosite-chinatelecom,回国或直连,no-resolve
+  - RULE-SET,geosite-chinaunicom,回国或直连,no-resolve
+  - RULE-SET,sukka-neteasemusic-ip,回国或直连,no-resolve
   - AND,((NETWORK,UDP),(DST-PORT,443),(OR,((RULE-SET,geosite-bilibili,no-resolve),(RULE-SET,geosite-iqiyi,no-resolve),(RULE-SET,geosite-youku,no-resolve),(RULE-SET,geosite-hunantv,no-resolve),(RULE-SET,geosite-cctv,no-resolve),(RULE-SET,geosite-tencent-tme,no-resolve),(RULE-SET,sukka-neteasemusic,no-resolve),(RULE-SET,geosite-icbc,no-resolve),(RULE-SET,geosite-boc,no-resolve),(RULE-SET,geosite-ccb,no-resolve),(RULE-SET,geosite-cmb,no-resolve),(RULE-SET,geosite-citic,no-resolve),(RULE-SET,geosite-pingan,no-resolve),(RULE-SET,geosite-unionpay,no-resolve),(RULE-SET,geosite-category-bank-cn,no-resolve),(RULE-SET,geosite-chinamobile,no-resolve),(RULE-SET,geosite-chinatelecom,no-resolve),(RULE-SET,geosite-chinaunicom,no-resolve),(RULE-SET,sukka-neteasemusic-ip,no-resolve)))),REJECT
   - MATCH,DIRECT

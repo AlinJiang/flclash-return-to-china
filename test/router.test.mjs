@@ -22,13 +22,14 @@ test('router/config.yaml is up to date with override.js', () => {
 });
 
 test('the router config routes like FlClash devices, with the airport as a provider', () => {
-  const [returnGroup, global] = config['proxy-groups'];
+  const [returnGroup, fallback, global] = config['proxy-groups'];
   assert.equal(returnGroup.name, '回国节点');
   assert.deepEqual(returnGroup.use, ['airport']);
   assert.equal(returnGroup.proxies, undefined);
+  assert.deepEqual([fallback.name, fallback.type, fallback.proxies], ['回国或直连', 'fallback', ['回国节点', 'DIRECT']]);
   assert.deepEqual(global, { name: 'GLOBAL', type: 'select', hidden: true, proxies: ['回国节点', 'DIRECT'] });
   assert.equal(config.rules.at(-1), 'MATCH,DIRECT');
-  assert.ok(config.rules.some((rule) => rule === 'RULE-SET,own-return,回国节点,no-resolve'));
+  assert.ok(config.rules.some((rule) => rule === 'RULE-SET,own-return,回国或直连,no-resolve'));
   const ownBase = scriptValue('SETTINGS.ownRulesBase');
   assert.equal(config['rule-providers']['own-return'].url, `${ownBase}return.txt`);
 });
