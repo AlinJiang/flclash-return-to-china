@@ -1,0 +1,82 @@
+#!/bin/sh
+# Shows and switches the outbound mode of the NAS side router (router/README.md)
+# from any shell in the LAN, such as over SSH from a phone.
+#
+#   router-mode           the mode, and where return traffic goes now
+#   router-mode rule      by the rules, the default
+#   router-mode global    everything through 回国节点
+#   router-mode direct    everything direct
+#   router-mode refresh   download every rule list and the subscription now
+#
+# The router goes back to rule whenever it restarts. The dashboard password is
+# read from ~/.config/router-mode/secret (chmod 600); ROUTER and
+# ROUTER_SECRET_FILE override the address and the file.
+set -eu
+
+router=${ROUTER:-192.168.50.2:9090}
+secret_file=${ROUTER_SECRET_FILE:-$HOME/.config/router-mode/secret}
+# 回国节点 and 回国或直连, percent-encoded for the URL path.
+return_path=%E5%9B%9E%E5%9B%BD%E8%8A%82%E7%82%B9
+fallback_path=%E5%9B%9E%E5%9B%BD%E6%88%96%E7%9B%B4%E8%BF%9E
+
+if [ ! -r "$secret_file" ]; then
+  echo "router-mode: put the dashboard password in $secret_file (chmod 600)" >&2
+  exit 1
+fi
+
+# api METHOD PATH [curl options]. The password reaches curl on stdin, so it
+# never shows in the process list.
+api() {
+  method=$1 route=$2
+  shift 2
+  printf 'oauth2-bearer = "%s"\n' "$(tr -d '[:space:]' < "$secret_file")" |
+    curl -sS -f -m 30 -K - -X "$method" "$@" "http://$router$route"
+}
+
+# field NAME JSON: the first string value of NAME.
+field() {
+  printf '%s\n' "$2" | grep -o "\"$1\":\"[^\"]*\"" | head -n 1 | cut -d '"' -f 4
+}
+
+status() {
+  config=$(api GET /configs)
+  group=$(api GET "/proxies/$return_path")
+  fallback=$(api GET "/proxies/$fallback_path")
+  echo "mode: $(field mode "$config")"
+  if [ "$(field now "$fallback")" = DIRECT ]; then
+    echo 'return traffic: DIRECT, every return node failed its last check'
+  else
+    pinned=$(field fixed "$group")
+    echo "return traffic: $(field now "$group")${pinned:+ (pinned)}"
+  fi
+}
+
+case ${1:-status} in
+  status)
+    status
+    ;;
+  rule | direct)
+    api PATCH /configs -d "{\"mode\":\"$1\"}"
+    status
+    ;;
+  global)
+    # Global mode sends everything to GLOBAL, so it must point at the return group.
+    api PUT /proxies/GLOBAL -d '{"name":"回国节点"}'
+    api PATCH /configs -d '{"mode":"global"}'
+    status
+    ;;
+  refresh)
+    providers=$(api GET /providers/rules)
+    count=0
+    for name in $(printf '%s\n' "$providers" | grep -o '"name":"[^"]*"' | cut -d '"' -f 4); do
+      api PUT "/providers/rules/$name"
+      count=$((count + 1))
+    done
+    api PUT /providers/proxies/airport
+    echo "updated $count rule lists and the subscription"
+    ;;
+  *)
+    echo 'usage: router-mode [status | rule | global | direct | refresh]' >&2
+    exit 2
+    ;;
+esac

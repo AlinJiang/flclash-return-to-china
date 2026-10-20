@@ -213,7 +213,7 @@ MIHOMO_BIN=/tmp/mihomo ROUTE_PROBE_BIN=/tmp/route-probe MIHOMO_GEODATA_DIR=/tmp/
 - `rules/`：我们自己维护的三份规则。
 - `test/`：测试。`fixtures/profiles.mjs` 是虚构的机场配置，`route-probe/` 是基于固定核心的路由探针。
 - `tools/check-profile.mjs`：用本地真实配置做离线检查。`tools/fetch-upstream.mjs`：下载并检查脚本用到的全部上游列表。
-- `router/`：NAS 旁路由的生成配置、Container Station 应用配置和部署说明。`tools/build-router-config.mjs`：生成 `router/config.yaml`。
+- `router/`：NAS 旁路由的生成配置、Container Station 应用配置、部署说明和切换模式的 `router-mode`。`tools/build-router-config.mjs`：生成 `router/config.yaml`。
 - `.github/workflows/test.yml`：CI。
 
 ## 致谢和许可
