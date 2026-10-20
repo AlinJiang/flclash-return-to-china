@@ -227,14 +227,16 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
     });
 
     await t.test('return traffic goes through the node once the subscription has loaded', async () => {
-      try {
-        await until('return traffic through the node', () => {
-          fetchFromClient('v.qq.com');
-          return /v\.qq\.com:443/.test(airportLog());
-        }, 60_000);
-      } finally {
-        t.diagnostic(routerLog().split('\n').filter((line) => line.includes('v.qq.com')).join('\n'));
-      }
+      // On the first start the fallback checks 回国节点 before the subscription
+      // has loaded, and 回国节点 keeps that empty pick (COMPATIBLE) for 10 s
+      // (adapter/outboundgroup/urltest.go), so return traffic waits for it.
+      await until('return traffic through the node', () => {
+        fetchFromClient('v.qq.com');
+        return /v\.qq\.com:443/.test(airportLog());
+      }, 60_000).catch((error) => {
+        // The router's log names the rule and the chain each connection took.
+        throw new Error(`${error.message}\n${routerLog().split('\n').filter((line) => line.includes('v.qq.com')).join('\n')}`);
+      });
     });
 
     await t.test('LAN clients resolve names through the router', () => {

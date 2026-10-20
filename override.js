@@ -315,8 +315,8 @@ function buildFallbackGroup(name, returnName) {
     type: 'fallback',
     proxies: [returnName, 'DIRECT'],
     ...HEALTH_CHECK,
-    // One failed check, such as the first one at a cold start before the
-    // subscription has loaded, sends return traffic DIRECT until the next.
+    // While in use, return traffic is back on 回国节点 within a minute of the
+    // airport recovering.
     interval: 60,
     lazy: true,
     hidden: true,
