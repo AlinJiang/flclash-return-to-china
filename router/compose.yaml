@@ -24,6 +24,11 @@ services:
       UPSTREAM_DNS: 192.168.50.1
       CONFIG_URL: https://raw.githubusercontent.com/AlinJiang/flclash-return-to-china/main/router/config.yaml
       REFRESH_SECONDS: 3600
+      # LAN servers the router port-forwards to, as host:port (TCP), separated
+      # by spaces, for example 192.168.50.5:2222. Their replies go straight
+      # back to the router: Mihomo never saw those connections start and
+      # would drop them.
+      DIRECT_REPLIES: '192.168.50.5:2222'
     cap_add:
       - NET_ADMIN
     devices:
@@ -61,6 +66,15 @@ services:
           mv "$$home/next.yaml" "$$home/config.yaml"
         }
         mkdir -p "$$home"
+        # Policy rules ahead of the TUN's (priority 9000 and up) send these
+        # replies through the main table, whose default route is the router.
+        while ip rule del priority 8000 2> /dev/null; do :; done
+        if [ -n "$${DIRECT_REPLIES:-}" ]; then
+          ip -V 2> /dev/null | grep -q iproute2 || apk add --no-cache -q iproute2 || echo 'Could not install iproute2; DIRECT_REPLIES is not applied.' >&2
+          for pair in $${DIRECT_REPLIES:-}; do
+            ip rule add priority 8000 from "$${pair%:*}" iif eth0 ipproto tcp sport "$${pair##*:}" lookup main || echo "Could not route replies from $$pair to the router." >&2
+          done
+        fi
         render || test -s "$$home/config.yaml" || { echo 'No config yet and the template could not be fetched.' >&2; exit 1; }
         # Restarting PID 1 hands the new config to a fresh Mihomo.
         ( while sleep "$$REFRESH_SECONDS"; do if render; then kill 1; fi; done ) &
