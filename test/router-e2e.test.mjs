@@ -26,6 +26,8 @@ if (process.env.CI && !enabled) {
 
 const PROJECT = 'router-e2e';
 const NET = '198.51.100';
+// The internet side of the home router (TEST-NET-3).
+const WAN = '203.0.113';
 const ROUTER = `${NET}.2`;
 const SECRET = 'test-only-secret';
 const RETURN = '回国节点';
@@ -97,6 +99,7 @@ services:
       CONTROLLER_SECRET: ${SECRET}
       UPSTREAM_DNS: 1.1.1.1
       REFRESH_SECONDS: 5
+      DIRECT_REPLIES: ${NET}.21:2222
     networks: !override
       lan:
         ipv4_address: ${ROUTER}
@@ -111,6 +114,27 @@ services:
     command: [-d, /airport, -f, /airport/airport.yaml]
     volumes: ['${directory}/airport.yaml:/airport/airport.yaml:ro']
     networks: { lan: { ipv4_address: ${NET}.11 } }
+  # The home router: forwards ${WAN}.254:2222 to the workstation, like the
+  # ASUS port forward, and gives the LAN its way out.
+  lanrouter:
+    image: ${ROUTER_IMAGE}
+    cap_add: [NET_ADMIN]
+    sysctls: { net.ipv4.ip_forward: 1 }
+    entrypoint: [/bin/sh, -c]
+    command: ['iptables -t nat -A PREROUTING -d ${WAN}.254 -p tcp --dport 2222 -j DNAT --to-destination ${NET}.21:2222 && iptables -t nat -A POSTROUTING -s ${NET}.0/24 ! -d ${NET}.0/24 -j MASQUERADE && exec sleep 3600']
+    networks: { lan: { ipv4_address: ${NET}.254 }, wan: { ipv4_address: ${WAN}.254 } }
+  # A LAN server behind the port forward whose gateway is the side router.
+  workstation:
+    image: busybox:1.37.0
+    cap_add: [NET_ADMIN]
+    entrypoint: [/bin/sh, -c]
+    command: ['ip route replace default via ${ROUTER} && mkdir -p /www && echo reachable > /www/index.html && exec httpd -f -p 2222 -h /www']
+    networks: { lan: { ipv4_address: ${NET}.21 } }
+  outsider:
+    image: curlimages/curl:8.17.0
+    entrypoint: [/bin/sh, -c]
+    command: ['exec sleep 3600']
+    networks: { wan: { ipv4_address: ${WAN}.20 } }
   client:
     image: curlimages/curl:8.17.0
     user: root
@@ -126,6 +150,14 @@ networks:
       config:
         - subnet: ${NET}.0/24
           gateway: ${NET}.1
+  # internal: Docker's host masquerade would otherwise rewrite the outsider's
+  # address as the forwarded packet crosses the LAN bridge.
+  wan:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${WAN}.0/24
+          gateway: ${WAN}.1
 `);
   return www;
 }
@@ -153,7 +185,7 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
   const resolves = (name) => {
     const result = client('nslookup', '-type=a', name, ROUTER);
     assert.equal(result.status, 0, result.output);
-    assert.match(result.output, /^Address: \d+(\.\d+){3}$/m, result.output);
+    assert.match(result.output, /^Address: (?!0\.0\.0\.0$)\d+(\.\d+){3}$/m, result.output);
   };
   // An HTTPS request from the LAN client; any status line counts as reachable.
   const fetchFromClient = (host) => client('curl', '-sS', '-o', '/dev/null', '-m', '20', '-w', '%{http_code}', `https://${host}`);
@@ -191,11 +223,20 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       assert.equal(direct.status, 0, direct.output);
       const viaNode = fetchFromClient('v.qq.com');
       assert.equal(viaNode.status, 0, viaNode.output);
-      // It resolves and the TCP connection opens, so only the rule can stop it:
-      // curl fails in the TLS handshake (35) or on receive (56), not on DNS (6) or connect (7).
-      resolves('amdc.m.taobao.com');
-      const ad = fetchFromClient('amdc.m.taobao.com');
-      assert.ok([35, 56].includes(ad.status), `an ad host must be rejected after connecting:\n${ad.output}`);
+      // Taobao's DNS answers 0.0.0.0 abroad at times, so the client skips DNS and
+      // dials a reserved address; the sniffer still reads the name from the TLS
+      // handshake. A rejected connection fails in the handshake (35) or on receive
+      // (56); one that slipped through would time out dialing 192.0.2.1 (28).
+      // The router's own log names the rule that stopped it.
+      api('PATCH', '/configs', { 'log-level': 'info' });
+      try {
+        const adHost = 'amdc.m.taobao.com';
+        const ad = client('curl', '-sS', '-o', '/dev/null', '-m', '10', '--resolve', `${adHost}:443:192.0.2.1`, `https://${adHost}`);
+        assert.ok([35, 56].includes(ad.status), `an ad host must be rejected after connecting:\n${ad.output}`);
+        assert.match(compose('logs', '--no-color', 'mihomo').output, /amdc\.m\.taobao\.com:443 match .* using REJECT/);
+      } finally {
+        api('PATCH', '/configs', { 'log-level': 'warning' });
+      }
       const log = airportLog();
       assert.match(log, /v\.qq\.com:443/);
       assert.doesNotMatch(log, /baidu\.com/);
@@ -213,6 +254,22 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       } finally {
         api('PATCH', '/configs', { mode: 'rule' });
       }
+    });
+
+    await t.test('a port-forwarded LAN server answers the internet, and still goes out through the router', () => {
+      const exec = (service, ...args) => run('docker', ['compose', '-p', PROJECT, '-f', composeFile, '-f', path.join(directory, 'override.yaml'), 'exec', '-T', service, ...args], { allowFailure: true, timeout: 60_000 });
+      // On the NAS the side router's default route is the home router; here it is Docker's bridge.
+      run('docker', ['exec', `${PROJECT}-mihomo-1`, 'ip', 'route', 'replace', 'default', 'via', `${NET}.254`]);
+      const fromOutside = () => exec('outsider', 'curl', '-sS', '-m', '10', `http://${WAN}.254:2222/`);
+      const answered = fromOutside();
+      assert.equal(answered.status, 0, answered.output);
+      assert.match(answered.stdout, /reachable/);
+      // Its own traffic still goes through Mihomo and the rules.
+      const out = exec('workstation', 'wget', '-q', '-O', '/dev/null', '-T', '15', `http://${'v.qq.com'}/`);
+      assert.match(airportLog(), /v\.qq\.com:80/, out.output);
+      // Without the rule the reply enters the TUN and is lost.
+      run('docker', ['exec', `${PROJECT}-mihomo-1`, 'ip', 'rule', 'del', 'priority', '8000']);
+      assert.notEqual(fromOutside().status, 0, 'the reply must need the DIRECT_REPLIES rule');
     });
 
     await t.test('a template that does not parse is ignored', async () => {
