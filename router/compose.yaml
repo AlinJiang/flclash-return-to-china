@@ -3,9 +3,9 @@
 # two <...> values and check the addresses. Steps: router/README.md.
 #
 # Startup: fetch router/config.yaml from main, fill in the values below, check
-# it with `mihomo -t` and run it. Every hour the template is fetched again; a
-# changed one replaces the config and restarts the container. When GitHub is
-# unreachable the last good config keeps running.
+# it with `mihomo -t` and run it. Every 5 minutes the template is fetched
+# again; a changed one replaces the config and restarts the container. When
+# GitHub is unreachable the last good config keeps running.
 services:
   mihomo:
     image: metacubex/mihomo:v1.19.32
@@ -23,7 +23,9 @@ services:
       # The LAN router: DNS for everything Mihomo resolves.
       UPSTREAM_DNS: 192.168.50.1
       CONFIG_URL: https://raw.githubusercontent.com/AlinJiang/flclash-return-to-china/main/router/config.yaml
-      REFRESH_SECONDS: 3600
+      # How often to fetch the template. GitHub caches it for 5 minutes, and an
+      # unchanged one costs a 15 KB download, nothing more.
+      REFRESH_SECONDS: 300
       # LAN servers the router port-forwards to, as host:port (TCP), separated
       # by spaces, for example 192.168.50.5:2222. Their replies go straight
       # back to the router: Mihomo never saw those connections start and
