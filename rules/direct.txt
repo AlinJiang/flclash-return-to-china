@@ -9,6 +9,10 @@ DOMAIN-SUFFIX,finder.video.qq.com
 DOMAIN-SUFFIX,findermp.video.qq.com
 DOMAIN-WILDCARD,*wxsns.video.qq.com
 
+# QQ 音乐的音频文件：在腾讯云 CDN 上，海外有节点，不应被 v2fly tencent-tme 的 y.qq.com 带去回国。
+# 播放地址由 u.y.qq.com 等接口签发，接口仍然回国。
+DOMAIN-WILDCARD,music-file*.y.qq.com
+
 # 银行、运营商的海外公司：v2fly 没有标 @!cn，不需要中国 IP。
 DOMAIN-SUFFIX,hk.chinamobile.com
 DOMAIN-SUFFIX,cmi.chinamobile.com
