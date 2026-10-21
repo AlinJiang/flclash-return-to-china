@@ -105,6 +105,7 @@ const OWN_FALLBACK = {
   url: HEALTH_URL,
   'expected-status': '204',
   interval: 60,
+  timeout: 10000,
   lazy: true,
   hidden: true,
 };
