@@ -33,7 +33,7 @@ const SETTINGS = {
   mediaCdnViaReturn: false,
 };
 
-const SCRIPT_VERSION = '3.1.0';
+const SCRIPT_VERSION = '3.1.1';
 
 // FlClash 按组名记住手动选择，不要随意改名。
 const RETURN_GROUP = '回国节点';
@@ -318,6 +318,11 @@ function buildFallbackGroup(name, returnName) {
     // While in use, return traffic is back on 回国节点 within a minute of the
     // airport recovering.
     interval: 60,
+    // One failed check sends return traffic DIRECT until the next, where
+    // region-locked APIs fail. The return lines answer in over 5 s (the
+    // default) at times in China's daytime, so wait 10 s: a slow node still
+    // serves those APIs, and an airport that is down fails at once.
+    timeout: 10000,
     lazy: true,
     hidden: true,
   };
