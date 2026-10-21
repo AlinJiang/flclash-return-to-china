@@ -55,6 +55,8 @@ const ROUTES = [
   ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, 'DIRECT'],
   ['tcp', 'i0.hdslb.com', 443, 'DIRECT'],
   ['tcp', 'm801.music.126.net', 443, 'DIRECT'],
+  ['tcp', 'aqqmusic.tc.qq.com', 443, 'DIRECT'],
+  ['tcp', 'sjy6.stream.qqmusic.qq.com', 443, 'DIRECT'],
   // Overseas editions and overseas subsidiaries stay local.
   ['tcp', 'www.bilibili.tv', 443, 'DIRECT'],
   ['tcp', 'www.iq.com', 443, 'DIRECT'],
@@ -82,6 +84,7 @@ const ROUTES = [
   ['tcp', 'finder.video.qq.com', 443, 'DIRECT'],
   ['tcp', 'findermp.video.qq.com', 443, 'DIRECT'],
   ['tcp', 'szzjwxsns.video.qq.com', 443, 'DIRECT'],
+  ['tcp', 'music-file6.y.qq.com', 443, 'DIRECT'],
   // Everything else is local, China services that work abroad included.
   ['tcp', 'www.baidu.com', 443, 'DIRECT'],
   ['tcp', 'weixin.qq.com', 443, 'DIRECT'],
