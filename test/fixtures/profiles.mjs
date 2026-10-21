@@ -114,6 +114,26 @@ export function mixedProfile() {
   };
 }
 
+/** An airport that sells both directions and flags its mainland exits, as EdNovas does. */
+export function bothDirectionsProfile() {
+  const nodes = [
+    '剩余流量：200 GB', '🇭🇰 香港 IEPL 01', '🇯🇵 日本 沪日隧道', '5.0X 🇨🇳 日志记录 北京', '5.0X 🇨🇳 日志记录 上海 香港中转',
+  ];
+  return {
+    'mixed-port': 7890,
+    dns: airportDns(),
+    proxies: [
+      ss(nodes[0], '127.0.0.1'),
+      trojan(nodes[1], 'hk.node.invalid'),
+      trojan(nodes[2], 'jp.node.invalid'),
+      ss(nodes[3], 'bj.node.invalid'),
+      ss(nodes[4], 'sh.node.invalid'),
+    ],
+    'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: nodes.slice(1) }],
+    rules: ['MATCH,PROXY'],
+  };
+}
+
 /** Chains and other retained sections that name airport groups at parse time. */
 export function chainProfile() {
   return {
@@ -328,6 +348,7 @@ export const PROFILES = {
   subconverter: subconverterProfile,
   provider: providerProfile,
   mixed: mixedProfile,
+  bothDirections: bothDirectionsProfile,
   chain: chainProfile,
   providerChain: providerChainProfile,
   allRelays: allRelaysProfile,

@@ -33,7 +33,7 @@ const SETTINGS = {
   mediaCdnViaReturn: false,
 };
 
-const SCRIPT_VERSION = '3.1.1';
+const SCRIPT_VERSION = '3.2.0';
 
 // FlClash 按组名记住手动选择，不要随意改名。
 const RETURN_GROUP = '回国节点';
@@ -57,6 +57,12 @@ const NOTICE_PATTERN = [
 ].join('|');
 const NOTICE_NODE = new RegExp(NOTICE_PATTERN, 'iu');
 const NOTICE_EXCLUDE_FILTER = `(?i)${NOTICE_PATTERN}`;
+
+// Names that mark a mainland exit. An airport that sells both directions marks
+// its return nodes like this (🇨🇳 北京, 港广专线_回国); when no node matches,
+// every node counts, as on a return-only airport whose names give no hint.
+// 香港 is no sign either way: 上海 香港中转 exits in Shanghai.
+const MAINLAND_NODE = /🇨🇳|回国|大陆|内地/u;
 
 // Proxy types that never forward traffic to a remote exit: YAML types for
 // inline nodes, Mihomo adapter types for the exclude-type of provider nodes.
@@ -211,7 +217,9 @@ function returnMembers(config) {
       .filter((name) => typeof name === 'string' && name !== '' && !NOTICE_NODE.test(name)),
   );
   const hops = frontHops(config, inlineNames, providerNames);
-  const exitNodes = nodes.filter((name) => !hops.inline.has(name));
+  const exits = nodes.filter((name) => !hops.inline.has(name));
+  const mainland = exits.filter((name) => MAINLAND_NODE.test(name));
+  const exitNodes = mainland.length > 0 ? mainland : exits;
   const exitProviders = providerNames.filter((name) => !hops.providers.has(name));
   // Without a recognizable exit, offering the hops beats offering nothing.
   return exitNodes.length > 0 || exitProviders.length > 0
