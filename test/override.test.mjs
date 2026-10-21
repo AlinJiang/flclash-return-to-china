@@ -10,6 +10,7 @@ import {
   expiredProfile,
   flclashShapedProfile,
   mixedProfile,
+  bothDirectionsProfile,
   providerChainProfile,
   providerProfile,
   punctuatedRuleSetProfile,
@@ -390,15 +391,26 @@ test('names that collide with airport proxies, groups or providers get a determi
   const { output } = runInNode(input);
   const [ret, fallback] = output['proxy-groups'];
 
-  // 回国节点 is a node and 回国节点 2 an airport group.
+  // 回国节点 is a node and 回国节点 2 an airport group. The node's name also
+  // marks a mainland exit, so the unmarked 上海 is left out.
   assert.equal(ret.name, '回国节点 3');
-  assert.deepEqual(ret.proxies, ['回国节点', '上海']);
+  assert.deepEqual(ret.proxies, ['回国节点']);
   assert.deepEqual(ret.use, ['GLOBAL']);
   // The fallback falls back from the renamed group, never from the airport's node.
   assert.deepEqual(fallback.proxies, ['回国节点 3', 'DIRECT']);
   assert.deepEqual(output.rules, expectedRules());
   // A provider named GLOBAL leaves Mihomo's own GLOBAL alone; a second one would not parse.
   assert.equal(output['proxy-groups'].some((group) => group.name === 'GLOBAL'), false);
+});
+
+test('an airport that sells both directions gives only its flagged mainland exits to 回国节点', () => {
+  const { output } = runInNode(bothDirectionsProfile());
+  assert.deepEqual(groupByName(output, RETURN).proxies, ['5.0X 🇨🇳 日志记录 北京', '5.0X 🇨🇳 日志记录 上海 香港中转']);
+});
+
+test('an airport whose names give no direction keeps every node as a return node', () => {
+  const { output } = runInNode(mixedProfile());
+  assert.deepEqual(groupByName(output, RETURN).proxies, ['上海 IPLC 01', '北京 BGP 0.5倍流量']);
 });
 
 test('the fallback group gets a suffix when the airport already uses its name', () => {
