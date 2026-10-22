@@ -7,7 +7,7 @@
                                          └──回国流量──▶ 机场节点
 ```
 
-- `config.yaml`：由 `tools/build-router-config.mjs` 从 `override.js` 生成，不要手改。它和 FlClash 设备的唯一区别是：机场节点来自订阅（proxy-provider），以及 TUN、DNS、嗅探、控制面板这些网关设置。
+- `config.yaml`：由 `tools/build-router-config.mjs` 从 `override.js` 生成，不要手改。它和 FlClash 设备的唯一区别是：机场节点来自订阅（proxy-provider），以及 TUN、DNS、嗅探、控制面板这些网关设置。订阅里只用名字带 `🇨🇳`、`回国`、`大陆` 或 `内地` 的节点，同时卖出国节点的机场（例如 EdNovas）也能直接用；换成名字里没有这些标记的机场时，要改 `tools/build-router-config.mjs` 里的 `filter`。
 - `compose.yaml`：粘贴到 Container Station 的应用配置。容器启动时从 `main` 下载 `config.yaml`，填入订阅地址和面板密码，用 `mihomo -t` 检查后运行。之后每 5 分钟再下载一次，有变化就换上新配置并重启容器。GitHub 访问不了时，继续用上一份能用的配置。
 
 ## 一次性准备（已完成）

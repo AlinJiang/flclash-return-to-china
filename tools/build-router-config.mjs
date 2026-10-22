@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { runInNode } from '../test/support/flclash-runtime.mjs';
+import { runInNode, scriptValue } from '../test/support/flclash-runtime.mjs';
 
 const repositoryDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const routerConfigPath = path.join(repositoryDirectory, 'router/config.yaml');
@@ -78,6 +78,11 @@ export const ROUTER_BASE = {
       // FlClash's default subscription update interval.
       interval: 86400,
       path: './providers/airport.yaml',
+      // Only nodes named as mainland exits, as override.js picks inline ones:
+      // a subscription may sell overseas nodes too, and the script cannot see
+      // a provider's names. An airport whose names carry none of these marks
+      // needs its own pattern here.
+      filter: scriptValue('MAINLAND_NODE.source'),
     },
   },
 };
