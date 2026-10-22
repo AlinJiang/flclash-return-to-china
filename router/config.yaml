@@ -59,6 +59,7 @@ proxy-providers:
     url: '<SUBSCRIPTION_URL>'
     interval: 86400
     path: ./providers/airport.yaml
+    filter: 🇨🇳|回国|大陆|内地
 proxy-groups:
   - name: 回国节点
     type: url-test

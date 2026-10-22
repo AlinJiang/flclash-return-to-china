@@ -28,6 +28,7 @@ test('the router config routes like FlClash devices, with the airport as a provi
   assert.equal(returnGroup.proxies, undefined);
   assert.deepEqual([fallback.name, fallback.type, fallback.proxies], ['回国或直连', 'fallback', ['回国节点', 'DIRECT']]);
   assert.deepEqual(global, { name: 'GLOBAL', type: 'select', hidden: true, proxies: ['回国节点', 'DIRECT'] });
+  assert.equal(config['proxy-providers'].airport.filter, scriptValue('MAINLAND_NODE.source'));
   assert.equal(config.rules.at(-1), 'MATCH,DIRECT');
   assert.ok(config.rules.some((rule) => rule === 'RULE-SET,own-return,回国或直连,no-resolve'));
   const ownBase = scriptValue('SETTINGS.ownRulesBase');

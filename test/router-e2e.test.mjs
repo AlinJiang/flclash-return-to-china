@@ -32,7 +32,8 @@ const ROUTER = `${NET}.2`;
 const SECRET = 'test-only-secret';
 const RETURN = '回国节点';
 const FALLBACK = '回国或直连';
-const NODE = '上海 01';
+const NODE = '🇨🇳 上海 01';
+const OVERSEAS = '🇭🇰 香港 01';
 const NOTICE = '剩余流量：100 GB';
 const ROUTER_IMAGE = YAML.parse(fs.readFileSync(composeFile, 'utf8')).services.mihomo.image;
 const OWN_RULES = 'https://raw.githubusercontent.com/AlinJiang/flclash-return-to-china/main/rules/';
@@ -86,7 +87,7 @@ function writeFixtures(directory) {
   const node = (name) => ({ name, type: 'ss', server: `${NET}.11`, port: 8388, cipher: 'aes-128-gcm', password: 'test-only', udp: true });
   // A full Clash profile, as airports serve it: the provider only takes proxies.
   fs.writeFileSync(path.join(www, 'sub.yaml'), YAML.stringify({
-    proxies: [node(NODE), node(NOTICE)],
+    proxies: [node(NODE), node(OVERSEAS), node(NOTICE)],
     'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: [NODE] }],
     rules: ['MATCH,PROXY'],
   }));
@@ -208,7 +209,7 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
   try {
     compose('up', '-d', '--quiet-pull');
 
-    await t.test('the router fetches its config and the subscription, and drops notice nodes', async () => {
+    await t.test('the router fetches its config and the subscription, and keeps only mainland exits', async () => {
       const current = await until('the airport provider', () => {
         const value = group();
         return value.all?.includes(NODE) ? value : null;
