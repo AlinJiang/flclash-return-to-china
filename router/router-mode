@@ -15,10 +15,9 @@ set -eu
 
 router=${ROUTER:-192.168.50.2:9090}
 secret_file=${ROUTER_SECRET_FILE:-$HOME/.config/router-mode/secret}
-# 回国节点, 回国或直连 and 回国备用, percent-encoded for the URL path.
+# 回国节点 and 回国或直连, percent-encoded for the URL path.
 return_path=%E5%9B%9E%E5%9B%BD%E8%8A%82%E7%82%B9
 fallback_path=%E5%9B%9E%E5%9B%BD%E6%88%96%E7%9B%B4%E8%BF%9E
-backup_path=%E5%9B%9E%E5%9B%BD%E5%A4%87%E7%94%A8
 
 if [ ! -r "$secret_file" ]; then
   echo "router-mode: put the dashboard password in $secret_file (chmod 600)" >&2
@@ -44,17 +43,18 @@ status() {
   group=$(api GET "/proxies/$return_path")
   fallback=$(api GET "/proxies/$fallback_path")
   echo "mode: $(field mode "$config")"
-  case $(field now "$fallback") in
+  now=$(field now "$fallback")
+  case $now in
     DIRECT)
       echo 'return traffic: DIRECT, every return node failed its last check'
       ;;
-    回国备用*)
-      # 回国节点's node failed its last check before 回国节点 moved off it.
-      echo "return traffic: $(field now "$(api GET "/proxies/$backup_path")") (backup)"
-      ;;
-    *)
+    回国节点*)
       pinned=$(field fixed "$group")
       echo "return traffic: $(field now "$group")${pinned:+ (pinned)}"
+      ;;
+    *)
+      # 回国节点's node failed its last check, so 回国或直连 took the next node.
+      echo "return traffic: $now (fallback)"
       ;;
   esac
 }

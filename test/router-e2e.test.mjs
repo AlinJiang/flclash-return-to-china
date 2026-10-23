@@ -32,7 +32,6 @@ const ROUTER = `${NET}.2`;
 const SECRET = 'test-only-secret';
 const RETURN = '回国节点';
 const FALLBACK = '回国或直连';
-const BACKUP = '回国备用';
 const NODE = '🇨🇳 上海 01';
 // A second mainland node on its own stand-in airport, added for the failover test.
 const NODE2 = '🇨🇳 北京 02';
@@ -48,7 +47,7 @@ function servedTemplate(suffix = '') {
   // Check our groups every 5 s instead of every minute, so failover and
   // recovery show up in the test.
   let fast = template;
-  for (const name of [RETURN, FALLBACK, BACKUP]) {
+  for (const name of [RETURN, FALLBACK]) {
     const next = fast.replace(new RegExp(`(- name: ${name}\\n(?: {4}.*\\n)*? {4}interval: )\\d+\\n`), '$15\n');
     assert.notEqual(next, fast, name);
     fast = next;
@@ -338,12 +337,11 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
     await t.test("when 回国节点's node goes down, return traffic moves to another node instead of DIRECT", async () => {
       const now = (name) => api('GET', `/proxies/${encodeURIComponent(name)}`).now;
       const secondLog = () => compose('logs', '--no-color', 'airport2').output;
-      // Listed first, so 回国备用 takes it while 回国节点 stays pinned to NODE.
-      writeSubscription(www, [NODE2, NODE, OVERSEAS, NOTICE]);
+      writeSubscription(www, [NODE, NODE2, OVERSEAS, NOTICE]);
       api('PUT', '/providers/proxies/airport');
       await until('the second node', () => group().all?.includes(NODE2), 60_000);
       api('PUT', `/proxies/${encodeURIComponent(RETURN)}`, { name: NODE });
-      await until('回国备用 on the second node', () => now(BACKUP) === NODE2 && now(FALLBACK) === RETURN, 60_000);
+      await until('return traffic on the pinned node', () => now(RETURN) === NODE && now(FALLBACK) === RETURN, 60_000);
       compose('stop', 'airport');
       let wentDirect = false;
       await until('return traffic through the second node', () => {

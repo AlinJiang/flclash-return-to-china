@@ -60,6 +60,11 @@ proxy-providers:
     interval: 86400
     path: ./providers/airport.yaml
     filter: 🇨🇳|回国|大陆|内地
+  回国直连:
+    type: inline
+    payload:
+      - name: DIRECT
+        type: direct
 proxy-groups:
   - name: 回国节点
     type: url-test
@@ -76,20 +81,11 @@ proxy-groups:
     type: fallback
     proxies:
       - 回国节点
-      - 回国备用
-      - DIRECT
-    url: http://wifi.vivo.com.cn/generate_204
-    expected-status: "204"
-    interval: 60
-    timeout: 10000
-    lazy: true
-    hidden: true
-  - name: 回国备用
-    type: fallback
     use:
       - airport
+      - 回国直连
     exclude-filter: (?i)官网|网址|地址|剩余|已用|总流量|到期|过期|有效期|重置|套餐|订阅|群|频道|客服|公告|traffic|expire|website|https?://
-    exclude-type: Direct|Dns|Reject|RejectDrop|Rematch
+    exclude-type: Dns|Reject|RejectDrop|Rematch
     url: http://wifi.vivo.com.cn/generate_204
     expected-status: "204"
     interval: 60

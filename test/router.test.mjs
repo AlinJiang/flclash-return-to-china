@@ -22,12 +22,13 @@ test('router/config.yaml is up to date with override.js', () => {
 });
 
 test('the router config routes like FlClash devices, with the airport as a provider', () => {
-  const [returnGroup, fallback, backup, global] = config['proxy-groups'];
+  const [returnGroup, fallback, global] = config['proxy-groups'];
   assert.equal(returnGroup.name, '回国节点');
   assert.deepEqual(returnGroup.use, ['airport']);
   assert.equal(returnGroup.proxies, undefined);
-  assert.deepEqual([fallback.name, fallback.type, fallback.proxies], ['回国或直连', 'fallback', ['回国节点', '回国备用', 'DIRECT']]);
-  assert.deepEqual([backup.name, backup.type, backup.use], ['回国备用', 'fallback', ['airport']]);
+  // 回国节点, then each airport node, then DIRECT from a one-node provider.
+  assert.deepEqual([fallback.name, fallback.type, fallback.proxies, fallback.use], ['回国或直连', 'fallback', ['回国节点'], ['airport', '回国直连']]);
+  assert.deepEqual(config['proxy-providers']['回国直连'], { type: 'inline', payload: [{ name: 'DIRECT', type: 'direct' }] });
   assert.deepEqual(global, { name: 'GLOBAL', type: 'select', hidden: true, proxies: ['回国节点', 'DIRECT'] });
   assert.equal(config['proxy-providers'].airport.filter, scriptValue('MAINLAND_NODE.source'));
   assert.equal(config.rules.at(-1), 'MATCH,DIRECT');

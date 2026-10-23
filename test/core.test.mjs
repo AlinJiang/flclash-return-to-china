@@ -45,8 +45,8 @@ test('the degraded profile parses in the pinned core', { skip: unavailable }, ()
 test('the core check rejects the failure modes the script guards against', { skip: unavailable }, () => {
   // Deleting the airport groups breaks an inline dialer-proxy at parse time.
   const chain = runInNode(PROFILES.chain()).output;
-  // Keep only the script's own groups: 回国节点, its fallback, the backup and GLOBAL.
-  chain['proxy-groups'] = chain['proxy-groups'].slice(0, 4);
+  // Keep only the script's own groups: 回国节点, its fallback and GLOBAL.
+  chain['proxy-groups'] = chain['proxy-groups'].slice(0, 3);
   assertRejected(chain, /dialer-proxy \[🔗 前置节点\] not found/);
 
   // Deleting a rule-provider that retained DNS names fails parsing too.
