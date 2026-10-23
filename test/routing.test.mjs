@@ -172,7 +172,8 @@ test('every profile routes China-IP services to its fallback over its return gro
     const seen = probe(output, [], [fallback, returnGroup]).members;
     assert.equal(seen[fallback][0], returnGroup, name);
     assert.equal(seen[fallback].at(-1), 'DIRECT', name);
-    for (const node of seen[returnGroup].filter((member) => member !== 'DIRECT')) {
+    // An http provider stays empty offline, where 回国节点 holds COMPATIBLE instead.
+    for (const node of seen[returnGroup].filter((member) => !['DIRECT', 'COMPATIBLE'].includes(member))) {
       assert.ok(seen[fallback].includes(node), `${name}: ${node}`);
     }
   }
