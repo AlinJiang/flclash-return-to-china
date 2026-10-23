@@ -32,7 +32,10 @@ const ROUTER = `${NET}.2`;
 const SECRET = 'test-only-secret';
 const RETURN = '回国节点';
 const FALLBACK = '回国或直连';
+const BACKUP = '回国备用';
 const NODE = '🇨🇳 上海 01';
+// A second mainland node on its own stand-in airport, added for the failover test.
+const NODE2 = '🇨🇳 北京 02';
 const OVERSEAS = '🇭🇰 香港 01';
 const NOTICE = '剩余流量：100 GB';
 const ROUTER_IMAGE = YAML.parse(fs.readFileSync(composeFile, 'utf8')).services.mihomo.image;
@@ -42,9 +45,14 @@ const OWN_RULES = 'https://raw.githubusercontent.com/AlinJiang/flclash-return-to
 function servedTemplate(suffix = '') {
   const template = fs.readFileSync(path.join(repositoryDirectory, 'router/config.yaml'), 'utf8');
   assert.ok(template.includes(OWN_RULES));
-  // Check the fallback every 5 s instead of 60 s, so recovery shows up in the test.
-  const fast = template.replace(/(- name: 回国或直连\n(?: {4}.*\n)*? {4}interval: )60\n/, '$15\n');
-  assert.notEqual(fast, template);
+  // Check our groups every 5 s instead of every minute, so failover and
+  // recovery show up in the test.
+  let fast = template;
+  for (const name of [RETURN, FALLBACK, BACKUP]) {
+    const next = fast.replace(new RegExp(`(- name: ${name}\\n(?: {4}.*\\n)*? {4}interval: )\\d+\\n`), '$15\n');
+    assert.notEqual(next, fast, name);
+    fast = next;
+  }
   // Log every connection, so a test can read the rule and the chain it took.
   const verbose = fast.replace(/^log-level: warning$/m, 'log-level: info');
   assert.notEqual(verbose, fast);
@@ -79,18 +87,25 @@ async function until(label, check, timeoutMs = 180_000) {
   throw new Error(`timed out waiting for ${label}: ${last?.message ?? last}`);
 }
 
+/** A full Clash profile, as airports serve it: the provider only takes proxies. */
+function writeSubscription(www, names) {
+  const node = (name) => {
+    const address = name === NODE2 ? `${NET}.12` : `${NET}.11`;
+    return { name, type: 'ss', server: address, port: 8388, cipher: 'aes-128-gcm', password: 'test-only', udp: true };
+  };
+  fs.writeFileSync(path.join(www, 'sub.yaml'), YAML.stringify({
+    proxies: names.map(node),
+    'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: names }],
+    rules: ['MATCH,PROXY'],
+  }));
+}
+
 function writeFixtures(directory) {
   const www = path.join(directory, 'www');
   fs.mkdirSync(www);
   fs.writeFileSync(path.join(www, 'config.yaml'), servedTemplate());
   fs.cpSync(path.join(repositoryDirectory, 'rules'), path.join(www, 'rules'), { recursive: true });
-  const node = (name) => ({ name, type: 'ss', server: `${NET}.11`, port: 8388, cipher: 'aes-128-gcm', password: 'test-only', udp: true });
-  // A full Clash profile, as airports serve it: the provider only takes proxies.
-  fs.writeFileSync(path.join(www, 'sub.yaml'), YAML.stringify({
-    proxies: [node(NODE), node(OVERSEAS), node(NOTICE)],
-    'proxy-groups': [{ name: 'PROXY', type: 'select', proxies: [NODE] }],
-    rules: ['MATCH,PROXY'],
-  }));
+  writeSubscription(www, [NODE, OVERSEAS, NOTICE]);
   fs.writeFileSync(path.join(directory, 'airport.yaml'), YAML.stringify({
     'log-level': 'info',
     listeners: [{ name: 'ss-in', type: 'shadowsocks', port: 8388, listen: '0.0.0.0', cipher: 'aes-128-gcm', password: 'test-only', udp: true }],
@@ -111,7 +126,7 @@ services:
     networks: !override
       lan:
         ipv4_address: ${ROUTER}
-    depends_on: [www, airport]
+    depends_on: [www, airport, airport2]
   www:
     image: busybox:1.37.0
     command: [httpd, -f, -p, '80', -h, /www]
@@ -122,6 +137,11 @@ services:
     command: [-d, /airport, -f, /airport/airport.yaml]
     volumes: ['${directory}/airport.yaml:/airport/airport.yaml:ro']
     networks: { lan: { ipv4_address: ${NET}.11 } }
+  airport2:
+    image: ${ROUTER_IMAGE}
+    command: [-d, /airport, -f, /airport/airport.yaml]
+    volumes: ['${directory}/airport.yaml:/airport/airport.yaml:ro']
+    networks: { lan: { ipv4_address: ${NET}.12 } }
   # The home router: forwards ${WAN}.254:2222 to the workstation, like the
   # ASUS port forward, and gives the LAN its way out.
   lanrouter:
@@ -315,11 +335,31 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       assert.notEqual(fromOutside().status, 0, 'the reply must need the DIRECT_REPLIES rule');
     });
 
-    await t.test('with the airport down return traffic goes direct, and back to the node once it answers', async () => {
+    await t.test("when 回国节点's node goes down, return traffic moves to another node instead of DIRECT", async () => {
+      const now = (name) => api('GET', `/proxies/${encodeURIComponent(name)}`).now;
+      const secondLog = () => compose('logs', '--no-color', 'airport2').output;
+      // Listed first, so 回国备用 takes it while 回国节点 stays pinned to NODE.
+      writeSubscription(www, [NODE2, NODE, OVERSEAS, NOTICE]);
+      api('PUT', '/providers/proxies/airport');
+      await until('the second node', () => group().all?.includes(NODE2), 60_000);
+      api('PUT', `/proxies/${encodeURIComponent(RETURN)}`, { name: NODE });
+      await until('回国备用 on the second node', () => now(BACKUP) === NODE2 && now(FALLBACK) === RETURN, 60_000);
+      compose('stop', 'airport');
+      let wentDirect = false;
+      await until('return traffic through the second node', () => {
+        wentDirect ||= now(FALLBACK) === 'DIRECT';
+        fetchFromClient('v.qq.com');
+        wentDirect ||= now(FALLBACK) === 'DIRECT';
+        return /v\.qq\.com:443/.test(secondLog());
+      }, 90_000);
+      assert.equal(wentDirect, false, 'one dead node must not send return traffic DIRECT');
+      assert.match(routerMode(), new RegExp(`^return traffic: ${NODE2}`, 'm'));
+    });
+
+    await t.test('with every node down return traffic goes direct, and back to the node once it answers', async () => {
       const now = () => api('GET', `/proxies/${encodeURIComponent(FALLBACK)}`).now;
       const viaNode = () => (airportLog().match(/v\.qq\.com:443/g) ?? []).length;
-      assert.equal(now(), RETURN);
-      compose('stop', 'airport');
+      compose('stop', 'airport2');
       await until('the switch to DIRECT', () => {
         fetchFromClient('v.qq.com');
         return now() === 'DIRECT';
@@ -327,7 +367,7 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       assert.match(routerMode(), /^return traffic: DIRECT, every return node failed its last check$/m);
       const direct = fetchFromClient('v.qq.com');
       assert.equal(direct.status, 0, `China apps keep working while the airport is down:\n${direct.output}`);
-      compose('start', 'airport');
+      compose('start', 'airport', 'airport2');
       await until('the switch back to the node', () => {
         fetchFromClient('v.qq.com');
         return now() === RETURN;

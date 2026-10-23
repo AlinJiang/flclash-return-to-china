@@ -161,14 +161,17 @@ test('routing media CDNs home sends Bilibili video and NetEase audio home', { sk
 test('every profile routes China-IP services to its fallback over its return group', { skip: unavailable }, () => {
   for (const [name, profile] of Object.entries(PROFILES)) {
     const output = runInNode(profile()).output;
-    const [returnGroup, fallback] = output['proxy-groups'].map((group) => group.name);
+    const [returnGroup, fallback, backup] = output['proxy-groups'].map((group) => group.name);
     assertRoutes(output, [
       ['tcp', 'api.bilibili.com', 443, fallback],
       ['tcp', 'www.google.com', 443, 'DIRECT'],
     ]);
-    assert.ok(returnGroup.startsWith('回国节点') && fallback.startsWith('回国或直连'), name);
-    // The core sees the fallback as the return group first, then DIRECT.
-    assert.deepEqual(probe(output, [], [fallback]).members[fallback], [returnGroup, 'DIRECT'], name);
+    assert.ok(returnGroup.startsWith('回国节点') && fallback.startsWith('回国或直连') && backup.startsWith('回国备用'), name);
+    // The core sees the fallback as the return group first, then the backup, then DIRECT,
+    // and the backup with the same members as the return group.
+    const seen = probe(output, [], [fallback, returnGroup, backup]).members;
+    assert.deepEqual(seen[fallback], [returnGroup, backup, 'DIRECT'], name);
+    assert.deepEqual(seen[backup], seen[returnGroup], name);
   }
 });
 

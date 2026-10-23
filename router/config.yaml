@@ -65,22 +65,34 @@ proxy-groups:
     type: url-test
     use:
       - airport
-    url: https://wifi.vivo.com.cn/generate_204
-    expected-status: "204"
-    interval: 300
-    tolerance: 50
-    lazy: true
     exclude-filter: (?i)官网|网址|地址|剩余|已用|总流量|到期|过期|有效期|重置|套餐|订阅|群|频道|客服|公告|traffic|expire|website|https?://
     exclude-type: Direct|Dns|Reject|RejectDrop|Rematch
+    url: http://wifi.vivo.com.cn/generate_204
+    expected-status: "204"
+    interval: 60
+    tolerance: 300
+    lazy: true
   - name: 回国或直连
     type: fallback
     proxies:
       - 回国节点
+      - 回国备用
       - DIRECT
-    url: https://wifi.vivo.com.cn/generate_204
+    url: http://wifi.vivo.com.cn/generate_204
     expected-status: "204"
     interval: 60
     timeout: 10000
+    lazy: true
+    hidden: true
+  - name: 回国备用
+    type: fallback
+    use:
+      - airport
+    exclude-filter: (?i)官网|网址|地址|剩余|已用|总流量|到期|过期|有效期|重置|套餐|订阅|群|频道|客服|公告|traffic|expire|website|https?://
+    exclude-type: Direct|Dns|Reject|RejectDrop|Rematch
+    url: http://wifi.vivo.com.cn/generate_204
+    expected-status: "204"
+    interval: 60
     lazy: true
     hidden: true
   - name: GLOBAL

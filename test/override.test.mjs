@@ -20,7 +20,7 @@ import {
 } from './fixtures/profiles.mjs';
 
 const ROUTING_KEYS = ['proxy-groups', 'rule-providers', 'sub-rules', 'rules'];
-const HEALTH_URL = 'https://wifi.vivo.com.cn/generate_204';
+const HEALTH_URL = 'http://wifi.vivo.com.cn/generate_204';
 const NOTICE_FILTER = scriptValue('NOTICE_EXCLUDE_FILTER');
 const VERSION = scriptValue('SCRIPT_VERSION');
 const SUKKA_BASE = scriptValue('SUKKA_BASE');
@@ -28,8 +28,10 @@ const GEOSITE_BASE = scriptValue('GEOSITE_BASE');
 const OWN_BASE = vm.runInContext('SETTINGS.ownRulesBase', createNodeScriptContext().context);
 const NON_FORWARDING = 'Direct|Dns|Reject|RejectDrop|Rematch';
 const RETURN = '回国节点';
-// The hidden group the rules target: 回国节点 while it answers, else DIRECT.
+// The hidden group the rules target: 回国节点 while it answers, then 回国备用, else DIRECT.
 const FALLBACK = '回国或直连';
+// Hidden: the first return node that passed its last check.
+const BACKUP = '回国备用';
 
 // The routing plan, written out independently of the script's constants.
 const AD_LISTS = ['iqiyi', 'youku', 'hunantv', 'tencent-tme', 'cctv'];
@@ -102,7 +104,7 @@ const OWN_GLOBAL = { name: 'GLOBAL', type: 'select', hidden: true, proxies: [RET
 const OWN_FALLBACK = {
   name: FALLBACK,
   type: 'fallback',
-  proxies: [RETURN, 'DIRECT'],
+  proxies: [RETURN, BACKUP, 'DIRECT'],
   url: HEALTH_URL,
   'expected-status': '204',
   interval: 60,
@@ -111,13 +113,25 @@ const OWN_FALLBACK = {
   hidden: true,
 };
 
-/** Our group, the fallback the rules use, our GLOBAL for Global mode, then every airport group, hidden. */
+/** 回国备用 draws on exactly the nodes 回国节点 does, through the same filters. */
+function assertBackupMirrorsReturn(output) {
+  const [ret, , backup] = output['proxy-groups'];
+  const members = ({ proxies, use, 'exclude-filter': excludeFilter, 'exclude-type': excludeType }) => ({ proxies, use, excludeFilter, excludeType });
+  assert.deepEqual(
+    { name: backup.name, type: backup.type, url: backup.url, interval: backup.interval, lazy: backup.lazy, hidden: backup.hidden },
+    { name: BACKUP, type: 'fallback', url: HEALTH_URL, interval: 60, lazy: true, hidden: true },
+  );
+  assert.deepEqual(members(backup), members(ret));
+}
+
+/** Our group, the fallback the rules use, the backup, our GLOBAL for Global mode, then every airport group, hidden. */
 function assertAirportGroupsKeptHidden(input, output) {
   const airportGroups = input['proxy-groups'] ?? [];
   assert.deepEqual(output['proxy-groups'][1], OWN_FALLBACK);
-  assert.deepEqual(output['proxy-groups'][2], OWN_GLOBAL);
+  assertBackupMirrorsReturn(output);
+  assert.deepEqual(output['proxy-groups'][3], OWN_GLOBAL);
   assert.deepEqual(
-    output['proxy-groups'].slice(3),
+    output['proxy-groups'].slice(4),
     airportGroups.map((group) => ({ ...group, hidden: true })),
   );
 }
@@ -134,8 +148,8 @@ test('the current subconverter profile gets return routing and keeps everything 
     proxies: ['港广专线_回国', '港沪专线_回国'],
     url: HEALTH_URL,
     'expected-status': '204',
-    interval: 300,
-    tolerance: 50,
+    interval: 60,
+    tolerance: 300,
     lazy: true,
     'exclude-filter': NOTICE_FILTER,
   });
@@ -359,7 +373,7 @@ test('an airport GLOBAL group offers 回国节点 first instead of a second GLOB
   assert.deepEqual(output['proxy-groups'].filter((group) => group.name === 'GLOBAL'), [
     { name: 'GLOBAL', type: 'select', proxies: [RETURN, '🚀 节点选择', 'DIRECT'], hidden: true },
   ]);
-  const unchanged = output['proxy-groups'].slice(2).filter((group) => group.name !== 'GLOBAL');
+  const unchanged = output['proxy-groups'].slice(3).filter((group) => group.name !== 'GLOBAL');
   assert.deepEqual(unchanged, input['proxy-groups'].filter((group) => group.name !== 'GLOBAL').map((group) => ({ ...group, hidden: true })));
 });
 
@@ -397,7 +411,7 @@ test('names that collide with airport proxies, groups or providers get a determi
   assert.deepEqual(ret.proxies, ['回国节点']);
   assert.deepEqual(ret.use, ['GLOBAL']);
   // The fallback falls back from the renamed group, never from the airport's node.
-  assert.deepEqual(fallback.proxies, ['回国节点 3', 'DIRECT']);
+  assert.deepEqual(fallback.proxies, ['回国节点 3', '回国备用', 'DIRECT']);
   assert.deepEqual(output.rules, expectedRules());
   // A provider named GLOBAL leaves Mihomo's own GLOBAL alone; a second one would not parse.
   assert.equal(output['proxy-groups'].some((group) => group.name === 'GLOBAL'), false);
@@ -413,6 +427,21 @@ test('an airport whose names give no direction keeps every node as a return node
   assert.deepEqual(groupByName(output, RETURN).proxies, ['上海 IPLC 01', '北京 BGP 0.5倍流量']);
 });
 
+test('回国备用 mirrors 回国节点 for provider, mixed and expired profiles too', () => {
+  for (const profile of [providerProfile(), mixedProfile(), expiredProfile(), bothDirectionsProfile()]) {
+    assertBackupMirrorsReturn(runInNode(profile).output);
+  }
+});
+
+test('the backup group gets a suffix when the airport already uses its name', () => {
+  const input = subconverterProfile();
+  input['proxy-groups'].push({ name: BACKUP, type: 'select', proxies: ['DIRECT'] });
+  const { output } = runInNode(input);
+
+  assert.equal(output['proxy-groups'][2].name, `${BACKUP} 2`);
+  assert.deepEqual(groupByName(output, FALLBACK).proxies, [RETURN, `${BACKUP} 2`, 'DIRECT']);
+});
+
 test('the fallback group gets a suffix when the airport already uses its name', () => {
   const input = subconverterProfile();
   input['proxy-groups'].push({ name: FALLBACK, type: 'select', proxies: ['DIRECT'] });
@@ -422,15 +451,16 @@ test('the fallback group gets a suffix when the airport already uses its name', 
   assert.deepEqual(output.rules, expectedRules({ returnName: `${FALLBACK} 2` }));
 });
 
-test('the rules use a hidden fallback from 回国节点 to DIRECT', () => {
-  // fallback keeps the first member that passes its health check; both
-  // members share the URL that the return group uses, which answers from
-  // abroad too, so DIRECT is always there to take over.
+test('the rules use a hidden fallback from 回国节点 through 回国备用 to DIRECT', () => {
+  // fallback keeps the first member that passes its health check; all three
+  // groups share the URL, so they share each node's results, and the URL
+  // answers from abroad too, so DIRECT is always there to take over.
   const { output } = runInNode(subconverterProfile());
   const fallback = groupByName(output, FALLBACK);
   assert.deepEqual(fallback, OWN_FALLBACK);
-  assert.deepEqual(fallback.proxies, [RETURN, 'DIRECT']);
+  assert.deepEqual(fallback.proxies, [RETURN, BACKUP, 'DIRECT']);
   assert.equal(fallback.url, groupByName(output, RETURN).url);
+  assert.equal(groupByName(output, BACKUP).url, groupByName(output, RETURN).url);
   assert.ok(output.rules.every((rule) => !rule.endsWith(`,${RETURN},no-resolve`)), 'no rule skips the fallback');
 });
 

@@ -78,11 +78,11 @@ check(changed.length === 0, `non-routing root keys unchanged (${retainedKeys.len
 const groups = output['proxy-groups'];
 const degraded = groups[0]?.name?.startsWith('⚠️');
 check(!degraded, 'script built the return policy (no degraded fallback)');
-for (const group of groups.slice(0, 2)) {
+for (const group of groups.slice(0, 3)) {
   const members = [...(group.proxies ?? []), ...(group.use ?? []).map((name) => `use:${name}`)];
   console.log(`     group ${group.name} (${group.type}${group.hidden ? ', hidden' : ''}): ${members.map(mask).join(' | ')}`);
 }
-// After 回国节点 come our hidden fallback and GLOBAL, then the airport's groups, all hidden.
+// After 回国节点 come our hidden fallback, backup and GLOBAL, then the airport's groups, all hidden.
 check(degraded || groups.slice(1).every((group) => group.hidden === true), `${(input['proxy-groups'] ?? []).length} airport groups kept and hidden`);
 console.log(`     rule-providers: ${Object.keys(output['rule-providers'] ?? {}).map(mask).join(', ')}`);
 // Rules come from the script's own constants and SETTINGS, never from the airport.
@@ -110,8 +110,9 @@ if (!probeBinary) {
 } else if (degraded || !coreParsed) {
   console.log('skip routing probe (the output must build and parse first)');
 } else {
-  // Rules target the fallback (groups[1]); it uses 回国节点 (groups[0]) while that answers.
-  const [returnGroup, ruleTarget] = groups.map((group) => group.name);
+  // Rules target the fallback (groups[1]); it uses 回国节点 (groups[0]) while that
+  // answers, then 回国备用 (groups[2]).
+  const [returnGroup, ruleTarget, backupGroup] = groups.map((group) => group.name);
   const cases = [
     ['tcp', 'api.bilibili.com', 443, ruleTarget],
     ['tcp', 'upos-sz-mirrorcos.bilivideo.com', 443, 'DIRECT'],
@@ -130,7 +131,7 @@ if (!probeBinary) {
     // The airport's own providers stay as they are: they only serve its DNS and
     // sniffer, and route-probe never loads an http provider.
     const airportProviders = Object.keys(input['rule-providers'] ?? {});
-    const result = probe(output, cases, [returnGroup, ruleTarget, 'GLOBAL'], {}, airportProviders);
+    const result = probe(output, cases, [returnGroup, ruleTarget, backupGroup, 'GLOBAL'], {}, airportProviders);
     cases.forEach(([network, host, port, expected], index) => {
       const actual = result.cases[index];
       check(actual.outbound === expected && actual.resolutions === 0,
