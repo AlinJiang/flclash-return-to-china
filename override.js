@@ -313,10 +313,11 @@ function buildReturnGroup(name, members) {
     type: 'url-test',
     ...memberOptions(members),
     ...HEALTH_CHECK,
-    // Each check tests every node. Mihomo keeps the results per node and test
-    // URL, shared with 回国或直连, so both see a dead node within a minute. A
-    // provider also takes the interval of the first group that registers its
-    // URL (adapter/provider/healthcheck.go), so both groups use the same one.
+    // Each check tests every inline node. Mihomo keeps the results per node and
+    // test URL, shared with 回国或直连, so both see a dead node within a minute.
+    // Provider nodes follow the provider's own check, or the interval of the
+    // first group that registers the URL (adapter/provider/healthcheck.go); the
+    // side router gives its provider a 60 s check of its own.
     interval: 60,
     // Stay on a node until another is 300 ms faster: return traffic is APIs and
     // media, where that gap goes unnoticed, and each switch changes the exit
@@ -477,6 +478,36 @@ function assertResolvable(output, ourGroups) {
   }
 }
 
+/** Orders like Go's string sort, by UTF-8 bytes, which is code point order. */
+function byCodePoint(a, b) {
+  const x = [...a];
+  const y = [...b];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const difference = x[i].codePointAt(0) - y[i].codePointAt(0);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+  return x.length - y.length;
+}
+
+/**
+ * Mihomo gives include-all and include-all-providers every provider, sorted by
+ * name (config/config.go), which would now take in 回国直连 and offer DIRECT
+ * to airport groups that DNS, chains or tunnels go through. Those groups list
+ * the airport's own providers, in the same order, instead.
+ */
+function withoutDirectProvider(groups, providerNames) {
+  const airportProviders = [...providerNames].sort(byCodePoint);
+  return groups.map((group) => {
+    if (!isObject(group) || (group['include-all'] !== true && group['include-all-providers'] !== true)) {
+      return group;
+    }
+    const { 'include-all': includeAll, 'include-all-providers': _providers, ...rest } = group;
+    return { ...rest, ...(includeAll === true ? { 'include-all-proxies': true } : {}), use: airportProviders };
+  });
+}
+
 /**
  * FlClash's Global mode sends everything through GLOBAL, so 回国节点 comes
  * first there: switching to Global is the one-tap "everything home". Mihomo
@@ -534,7 +565,8 @@ function buildProfile(config) {
   // Airport groups stay because dialer-proxy, DNS "#group", tunnels and remote
   // provider payloads may name them. No rule points at them any more, so they
   // are hidden from the Rule-mode proxies page.
-  const keptGroups = airportGroups.map((group) => (isObject(group) ? { ...group, hidden: true } : group));
+  const hiddenGroups = airportGroups.map((group) => (isObject(group) ? { ...group, hidden: true } : group));
+  const keptGroups = directProvider ? withoutDirectProvider(hiddenGroups, providerNames) : hiddenGroups;
   const proxyNames = new Set([...inlineProxies(config).map((proxy) => proxy.name), ...providerNames]);
   const groups = [returnGroup, fallbackGroup, ...withGlobal(keptGroups, returnName, proxyNames)];
   output['proxy-groups'] = groups;

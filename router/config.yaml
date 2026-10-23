@@ -60,6 +60,12 @@ proxy-providers:
     interval: 86400
     path: ./providers/airport.yaml
     filter: 🇨🇳|回国|大陆|内地
+    health-check:
+      enable: true
+      url: http://wifi.vivo.com.cn/generate_204
+      expected-status: "204"
+      interval: 60
+      lazy: true
   回国直连:
     type: inline
     payload:

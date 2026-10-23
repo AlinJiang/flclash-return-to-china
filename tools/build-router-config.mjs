@@ -83,6 +83,10 @@ export const ROUTER_BASE = {
       // a provider's names. An airport whose names carry none of these marks
       // needs its own pattern here.
       filter: scriptValue('MAINLAND_NODE.source'),
+      // Checks every node each minute with the groups' URL. The groups'
+      // registrations of the same URL are then ignored, so the interval does
+      // not depend on which group Mihomo parses first.
+      'health-check': { enable: true, ...scriptValue('HEALTH_CHECK'), interval: 60, lazy: true },
     },
   },
 };

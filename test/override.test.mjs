@@ -458,6 +458,25 @@ test('with providers, DIRECT comes from a one-node provider listed after the air
   assert.doesNotMatch(fallback['exclude-type'], /Direct/);
 });
 
+test('airport groups that take every provider list the airport\'s own instead, so they never get DIRECT', () => {
+  const input = providerProfile();
+  input['proxy-providers'].z = { type: 'http', url: 'https://airport.invalid/z?token=test-only', interval: 3600 };
+  input['proxy-groups'].push(
+    { name: '🔗 前置', type: 'select', 'include-all-providers': true },
+    { name: '全部', type: 'url-test', 'include-all': true, url: 'http://cp.cloudflare.com/generate_204', interval: 300 },
+  );
+  const { output } = runInNode(input);
+  // Go sorts provider names by UTF-8 bytes: z (0x7a) before 机场节点 (0xe6...).
+  assert.deepEqual(groupByName(output, '🔗 前置'), { name: '🔗 前置', type: 'select', use: ['z', '机场节点'], hidden: true });
+  assert.deepEqual(groupByName(output, '全部'), {
+    name: '全部', type: 'url-test', url: 'http://cp.cloudflare.com/generate_204', interval: 300, 'include-all-proxies': true, use: ['z', '机场节点'], hidden: true,
+  });
+  // Without providers there is no 回国直连, and such groups stay as they are.
+  const inline = subconverterProfile();
+  inline['proxy-groups'].push({ name: '全部', type: 'select', 'include-all': true });
+  assert.deepEqual(groupByName(runInNode(inline).output, '全部'), { name: '全部', type: 'select', 'include-all': true, hidden: true });
+});
+
 test('the direct provider gets a suffix when the airport already uses its name', () => {
   const input = providerProfile();
   input['proxy-providers'][DIRECT_PROVIDER] = { type: 'http', url: 'https://airport.invalid/x?token=test-only', interval: 3600 };

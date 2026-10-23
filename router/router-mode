@@ -48,9 +48,17 @@ status() {
     DIRECT)
       echo 'return traffic: DIRECT, every return node failed its last check'
       ;;
-    回国节点*)
+    回国节点)
+      node=$(field now "$group")
       pinned=$(field fixed "$group")
-      echo "return traffic: $(field now "$group")${pinned:+ (pinned)}"
+      if [ -z "$pinned" ]; then
+        note=''
+      elif [ "$pinned" = "$node" ]; then
+        note=' (pinned)'
+      else
+        note=" (pinned $pinned is down)"
+      fi
+      echo "return traffic: $node$note"
       ;;
     *)
       # 回国节点's node failed its last check, so 回国或直连 took the next node.

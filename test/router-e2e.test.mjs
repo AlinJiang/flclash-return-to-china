@@ -1,8 +1,10 @@
 // End-to-end test of the NAS side router: router/compose.yaml as written,
 // with this checkout's router/config.yaml, on a throwaway Docker network.
-// A LAN client uses the router as its gateway and DNS server; a stand-in
-// airport (Mihomo with a Shadowsocks inbound) is the only node. The router
+// A LAN client uses the router as its gateway and DNS server; two stand-in
+// airports (Mihomo with a Shadowsocks inbound) serve the nodes. The router
 // downloads the real rule lists, so this needs Docker and internet access.
+// Health checks go to a local page instead, so a slow check across the
+// Pacific cannot decide a failover test.
 //
 //   ROUTER_E2E=1 node --test test/router-e2e.test.mjs
 //
@@ -39,19 +41,22 @@ const OVERSEAS = '🇭🇰 香港 01';
 const NOTICE = '剩余流量：100 GB';
 const ROUTER_IMAGE = YAML.parse(fs.readFileSync(composeFile, 'utf8')).services.mihomo.image;
 const OWN_RULES = 'https://raw.githubusercontent.com/AlinJiang/flclash-return-to-china/main/rules/';
+const HEALTH_URL = 'http://wifi.vivo.com.cn/generate_204';
 
 /** This checkout's template, with our own rule files served from the test network instead of main. */
 function servedTemplate(suffix = '') {
   const template = fs.readFileSync(path.join(repositoryDirectory, 'router/config.yaml'), 'utf8');
   assert.ok(template.includes(OWN_RULES));
-  // Check our groups every 5 s instead of every minute, so failover and
-  // recovery show up in the test.
+  // Check our groups and the provider every 5 s instead of every minute, so
+  // failover and recovery show up in the test, against the local page.
   let fast = template;
-  for (const name of [RETURN, FALLBACK]) {
-    const next = fast.replace(new RegExp(`(- name: ${name}\\n(?: {4}.*\\n)*? {4}interval: )\\d+\\n`), '$15\n');
-    assert.notEqual(next, fast, name);
+  for (const block of ['- name: 回国节点\\n', '- name: 回国或直连\\n', '    health-check:\\n']) {
+    const next = fast.replace(new RegExp(`(${block}(?: {4}.*\\n)*? +interval: )\\d+\\n`), '$15\n');
+    assert.notEqual(next, fast, block);
     fast = next;
   }
+  assert.ok(fast.includes(HEALTH_URL));
+  fast = fast.replaceAll(HEALTH_URL, `http://${NET}.10/generate_204`).replaceAll('expected-status: "204"', 'expected-status: "200"');
   // Log every connection, so a test can read the rule and the chain it took.
   const verbose = fast.replace(/^log-level: warning$/m, 'log-level: info');
   assert.notEqual(verbose, fast);
@@ -103,6 +108,8 @@ function writeFixtures(directory) {
   const www = path.join(directory, 'www');
   fs.mkdirSync(www);
   fs.writeFileSync(path.join(www, 'config.yaml'), servedTemplate());
+  // busybox httpd answers 200 for a file; the served template expects that.
+  fs.writeFileSync(path.join(www, 'generate_204'), '');
   fs.cpSync(path.join(repositoryDirectory, 'rules'), path.join(www, 'rules'), { recursive: true });
   writeSubscription(www, [NODE, OVERSEAS, NOTICE]);
   fs.writeFileSync(path.join(directory, 'airport.yaml'), YAML.stringify({
@@ -342,6 +349,9 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
       await until('the second node', () => group().all?.includes(NODE2), 60_000);
       api('PUT', `/proxies/${encodeURIComponent(RETURN)}`, { name: NODE });
       await until('return traffic on the pinned node', () => now(RETURN) === NODE && now(FALLBACK) === RETURN, 60_000);
+      // Every node on its own, then DIRECT last, from the one-node provider.
+      assert.deepEqual(api('GET', `/proxies/${encodeURIComponent(FALLBACK)}`).all, [RETURN, NODE, NODE2, 'DIRECT']);
+      const logBefore = routerLog().length;
       compose('stop', 'airport');
       let wentDirect = false;
       await until('return traffic through the second node', () => {
@@ -351,6 +361,7 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
         return /v\.qq\.com:443/.test(secondLog());
       }, 90_000);
       assert.equal(wentDirect, false, 'one dead node must not send return traffic DIRECT');
+      assert.doesNotMatch(routerLog().slice(logBefore), /v\.qq\.com:443 match .* using 回国或直连\[DIRECT\]/);
       assert.match(routerMode(), new RegExp(`^return traffic: ${NODE2}`, 'm'));
     });
 
