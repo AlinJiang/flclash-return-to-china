@@ -372,9 +372,13 @@ test('the side router serves DNS, routes by the rules and recovers on its own', 
         fetchFromClient('v.qq.com');
         return now() === RETURN;
       }, 120_000);
+      // 回国或直连 can be back on 回国节点 while 回国节点 is still on the second
+      // node, before its next check finds the pinned one alive again.
       const before = viaNode();
-      assert.equal(fetchFromClient('v.qq.com').status, 0);
-      await until('the request through the node', () => viaNode() > before, 30_000);
+      await until('the request through the pinned node', () => {
+        assert.equal(fetchFromClient('v.qq.com').status, 0);
+        return viaNode() > before;
+      }, 60_000);
     });
 
     await t.test('a template that does not parse is ignored', async () => {
