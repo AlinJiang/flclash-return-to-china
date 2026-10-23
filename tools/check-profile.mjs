@@ -72,7 +72,12 @@ for (const entry of quickjs.logs) {
 }
 check(isDeepStrictEqual(node.output, output), 'QuickJS-ng and Node produce the same config');
 const retainedKeys = Object.keys(input).filter((key) => !ROUTING_KEYS.has(key));
-const changed = retainedKeys.filter((key) => !isDeepStrictEqual(input[key], output[key]));
+// With providers the script adds one inline provider holding only DIRECT, the fallback's last resort.
+const directOnly = (provider) => provider?.type === 'inline' && isDeepStrictEqual(provider.payload, [{ name: 'DIRECT', type: 'direct' }]);
+const kept = (key) => (key === 'proxy-providers' && output[key]
+  ? Object.fromEntries(Object.entries(output[key]).filter(([name, provider]) => !directOnly(provider) || name in (input[key] ?? {})))
+  : output[key]);
+const changed = retainedKeys.filter((key) => !isDeepStrictEqual(input[key], kept(key)));
 check(changed.length === 0, `non-routing root keys unchanged (${retainedKeys.length} keys${changed.length > 0 ? `; changed: ${changed.join(', ')}` : ''})`);
 
 const groups = output['proxy-groups'];

@@ -26,7 +26,13 @@ test('the router config routes like FlClash devices, with the airport as a provi
   assert.equal(returnGroup.name, '回国节点');
   assert.deepEqual(returnGroup.use, ['airport']);
   assert.equal(returnGroup.proxies, undefined);
-  assert.deepEqual([fallback.name, fallback.type, fallback.proxies], ['回国或直连', 'fallback', ['回国节点', 'DIRECT']]);
+  // 回国节点, then each airport node, then DIRECT from a one-node provider.
+  assert.deepEqual([fallback.name, fallback.type, fallback.proxies, fallback.use], ['回国或直连', 'fallback', ['回国节点'], ['airport', '回国直连']]);
+  assert.deepEqual(config['proxy-providers']['回国直连'], { type: 'inline', payload: [{ name: 'DIRECT', type: 'direct' }] });
+  // The provider checks its nodes itself, every minute, with the groups' URL.
+  assert.deepEqual(config['proxy-providers'].airport['health-check'], {
+    enable: true, url: returnGroup.url, 'expected-status': returnGroup['expected-status'], interval: 60, lazy: true,
+  });
   assert.deepEqual(global, { name: 'GLOBAL', type: 'select', hidden: true, proxies: ['回国节点', 'DIRECT'] });
   assert.equal(config['proxy-providers'].airport.filter, scriptValue('MAINLAND_NODE.source'));
   assert.equal(config.rules.at(-1), 'MATCH,DIRECT');

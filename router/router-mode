@@ -43,12 +43,28 @@ status() {
   group=$(api GET "/proxies/$return_path")
   fallback=$(api GET "/proxies/$fallback_path")
   echo "mode: $(field mode "$config")"
-  if [ "$(field now "$fallback")" = DIRECT ]; then
-    echo 'return traffic: DIRECT, every return node failed its last check'
-  else
-    pinned=$(field fixed "$group")
-    echo "return traffic: $(field now "$group")${pinned:+ (pinned)}"
-  fi
+  now=$(field now "$fallback")
+  case $now in
+    DIRECT)
+      echo 'return traffic: DIRECT, every return node failed its last check'
+      ;;
+    回国节点)
+      node=$(field now "$group")
+      pinned=$(field fixed "$group")
+      if [ -z "$pinned" ]; then
+        note=''
+      elif [ "$pinned" = "$node" ]; then
+        note=' (pinned)'
+      else
+        note=" (pinned $pinned is down)"
+      fi
+      echo "return traffic: $node$note"
+      ;;
+    *)
+      # 回国节点's node failed its last check, so 回国或直连 took the next node.
+      echo "return traffic: $now (fallback)"
+      ;;
+  esac
 }
 
 case ${1:-status} in

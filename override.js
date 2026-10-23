@@ -33,18 +33,22 @@ const SETTINGS = {
   mediaCdnViaReturn: false,
 };
 
-const SCRIPT_VERSION = '3.2.0';
+const SCRIPT_VERSION = '3.3.0';
 
 // FlClash 按组名记住手动选择，不要随意改名。
 const RETURN_GROUP = '回国节点';
 // 规则指向的隐藏组：回国节点能用就走它，整组都挂了改走直连，恢复后自动切回。
 const FALLBACK_GROUP = '回国或直连';
+// 只装着一个直连出口的订阅源，让直连排在机场订阅的节点之后（见 buildFallbackGroup）。
+const DIRECT_PROVIDER = '回国直连';
 const DEGRADED_GROUP = '⚠️ 回国脚本异常';
 
 // Return nodes exit inside mainland China, so a foreign endpoint would measure a
 // second border crossing. expected-status turns hijack pages into failures.
+// Plain HTTP: every check is return traffic, which airports meter (EdNovas at
+// 5x), and a TLS handshake here costs about 7 KB against 0.4 KB without it.
 const HEALTH_CHECK = {
-  url: 'https://wifi.vivo.com.cn/generate_204',
+  url: 'http://wifi.vivo.com.cn/generate_204',
   'expected-status': '204',
 };
 
@@ -283,25 +287,15 @@ function referencedRuleProviders(config) {
   return Object.fromEntries(Object.entries(providers).filter(([name]) => kept.has(name)));
 }
 
-/**
- * The one group users see. url-test picks the fastest return node; tapping a
- * node in FlClash pins it, and the core leaves a pinned node only while it is
- * down (adapter/outboundgroup/urltest.go).
- */
-function buildReturnGroup(name, { nodes, providers: providerNames }) {
-  // An expired subscription can leave no nodes at all. url-test needs a member
+/** The return nodes as 回国节点's members, with the filters provider nodes need at runtime. */
+function memberOptions({ nodes, providers: providerNames }) {
+  // An expired subscription can leave no nodes at all. A group needs a member
   // to parse, and DIRECT keeps China traffic working.
   const members = nodes.length === 0 && providerNames.length === 0
     ? { proxies: ['DIRECT'] }
     : { ...(nodes.length > 0 ? { proxies: nodes } : {}), ...(providerNames.length > 0 ? { use: providerNames } : {}) };
   return {
-    name,
-    type: 'url-test',
     ...members,
-    ...HEALTH_CHECK,
-    interval: 300,
-    tolerance: 50,
-    lazy: true,
     // Provider nodes are only known at runtime; inline ones are filtered above.
     'exclude-filter': NOTICE_EXCLUDE_FILTER,
     ...(providerNames.length > 0 ? { 'exclude-type': NON_FORWARDING_EXCLUDE_TYPE } : {}),
@@ -309,28 +303,62 @@ function buildReturnGroup(name, { nodes, providers: providerNames }) {
 }
 
 /**
- * The group the rules use. While the return group answers its health check it
- * carries the traffic; when every return node is down, DIRECT does, so China
- * apps keep working outside region-locked content. The core probes at start,
- * on repeated dial failures and every interval while in use, and returns to
- * the return group once it answers (adapter/outboundgroup/fallback.go,
- * adapter/provider/healthcheck.go). The check URL
- * also answers from abroad, so DIRECT always counts as alive.
+ * The one group users see. url-test picks the fastest return node; tapping a
+ * node in FlClash pins it, and the core leaves a pinned node only while it is
+ * down (adapter/outboundgroup/urltest.go).
  */
-function buildFallbackGroup(name, returnName) {
+function buildReturnGroup(name, members) {
+  return {
+    name,
+    type: 'url-test',
+    ...memberOptions(members),
+    ...HEALTH_CHECK,
+    // Each check tests every inline node. Mihomo keeps the results per node and
+    // test URL, shared with 回国或直连, so both see a dead node within a minute.
+    // Provider nodes follow the provider's own check, or the interval of the
+    // first group that registers the URL (adapter/provider/healthcheck.go); the
+    // side router gives its provider a 60 s check of its own.
+    interval: 60,
+    // Stay on a node until another is 300 ms faster: return traffic is APIs and
+    // media, where that gap goes unnoticed, and each switch changes the exit
+    // address. Over a day of EdNovas checks, 50 ms switched 18 times, 300 ms 10,
+    // for 14 ms more on average.
+    tolerance: 300,
+    lazy: true,
+  };
+}
+
+
+/**
+ * The group the rules use: 回国节点, then every return node on its own, then
+ * DIRECT. fallback takes the first member that passed its last check
+ * (adapter/outboundgroup/fallback.go). A group is checked through the node it
+ * is on, so when that node fails a check, return traffic moves to another
+ * node, and goes DIRECT, where region-locked APIs fail, only when every node
+ * failed. The check URL answers from abroad too, so DIRECT always passes.
+ *
+ * A group lists its own proxies before its providers' nodes
+ * (adapter/outboundgroup/parser.go), so with providers DIRECT comes from a
+ * one-node provider listed last.
+ */
+function buildFallbackGroup(name, returnName, { nodes, providers: providerNames }, directProvider) {
+  const members = providerNames.length === 0
+    ? { proxies: [returnName, ...nodes, 'DIRECT'] }
+    : {
+      proxies: [returnName, ...nodes],
+      use: [...providerNames, directProvider],
+      'exclude-filter': NOTICE_EXCLUDE_FILTER,
+      // Without Direct, which would drop the last resort; an airport's own
+      // direct nodes would join, as they do nowhere else.
+      'exclude-type': NON_FORWARDING_EXCLUDE_TYPE.replace('Direct|', ''),
+    };
   return {
     name,
     type: 'fallback',
-    proxies: [returnName, 'DIRECT'],
+    ...members,
     ...HEALTH_CHECK,
-    // While in use, return traffic is back on 回国节点 within a minute of the
-    // airport recovering.
+    // Back on 回国节点 within a minute of it answering again.
     interval: 60,
-    // One failed check sends return traffic DIRECT until the next, where
-    // region-locked APIs fail. The return lines answer in over 5 s (the
-    // default) at times in China's daytime, so wait 10 s: a slow node still
-    // serves those APIs, and an airport that is down fails at once.
-    timeout: 10000,
     lazy: true,
     hidden: true,
   };
@@ -450,6 +478,36 @@ function assertResolvable(output, ourGroups) {
   }
 }
 
+/** Orders like Go's string sort, by UTF-8 bytes, which is code point order. */
+function byCodePoint(a, b) {
+  const x = [...a];
+  const y = [...b];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const difference = x[i].codePointAt(0) - y[i].codePointAt(0);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+  return x.length - y.length;
+}
+
+/**
+ * Mihomo gives include-all and include-all-providers every provider, sorted by
+ * name (config/config.go), which would now take in 回国直连 and offer DIRECT
+ * to airport groups that DNS, chains or tunnels go through. Those groups list
+ * the airport's own providers, in the same order, instead.
+ */
+function withoutDirectProvider(groups, providerNames) {
+  const airportProviders = [...providerNames].sort(byCodePoint);
+  return groups.map((group) => {
+    if (!isObject(group) || (group['include-all'] !== true && group['include-all-providers'] !== true)) {
+      return group;
+    }
+    const { 'include-all': includeAll, 'include-all-providers': _providers, ...rest } = group;
+    return { ...rest, ...(includeAll === true ? { 'include-all-proxies': true } : {}), use: airportProviders };
+  });
+}
+
 /**
  * FlClash's Global mode sends everything through GLOBAL, so 回国节点 comes
  * first there: switching to Global is the one-tap "everything home". Mihomo
@@ -499,19 +557,29 @@ function buildProfile(config) {
   }
 
   const returnGroup = buildReturnGroup(returnName, members);
-  const fallbackGroup = buildFallbackGroup(fallbackName, returnName);
+  // Provider and group names share one namespace in Mihomo.
+  const directProvider = members.providers.length > 0 ? uniqueName(DIRECT_PROVIDER, takenGroupNames, ' ') : null;
+  const fallbackGroup = buildFallbackGroup(fallbackName, returnName, members, directProvider);
   const output = { ...config };
   delete output['sub-rules'];
   // Airport groups stay because dialer-proxy, DNS "#group", tunnels and remote
   // provider payloads may name them. No rule points at them any more, so they
   // are hidden from the Rule-mode proxies page.
-  const keptGroups = airportGroups.map((group) => (isObject(group) ? { ...group, hidden: true } : group));
+  const hiddenGroups = airportGroups.map((group) => (isObject(group) ? { ...group, hidden: true } : group));
+  const keptGroups = directProvider ? withoutDirectProvider(hiddenGroups, providerNames) : hiddenGroups;
   const proxyNames = new Set([...inlineProxies(config).map((proxy) => proxy.name), ...providerNames]);
   const groups = [returnGroup, fallbackGroup, ...withGlobal(keptGroups, returnName, proxyNames)];
   output['proxy-groups'] = groups;
+  if (directProvider) {
+    output['proxy-providers'] = {
+      ...config['proxy-providers'],
+      [directProvider]: { type: 'inline', payload: [{ name: 'DIRECT', type: 'direct' }] },
+    };
+  }
   output['rule-providers'] = ruleProviders;
   output.rules = buildRules(plan, ourProviderNames, fallbackName);
-  assertResolvable(output, groups.filter((group) => group === returnGroup || group === fallbackGroup || group?.name === 'GLOBAL'));
+  const ours = new Set([returnGroup, fallbackGroup]);
+  assertResolvable(output, groups.filter((group) => ours.has(group) || group?.name === 'GLOBAL'));
 
   console.log(
     `[return-to-china ${SCRIPT_VERSION}] ${members.nodes.length} nodes, ${members.providers.length} proxy providers, `

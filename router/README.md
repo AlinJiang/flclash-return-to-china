@@ -97,4 +97,4 @@ router-mode refresh   # 立刻重新下载全部规则列表和订阅
 ROUTER_E2E=1 node --test test/router-e2e.test.mjs
 ```
 
-用 Docker 在一个隔离的测试网络（198.51.100.0/24）里跑 `compose.yaml`：一个假机场节点、一台把旁路由当网关的客户端，检查 DNS、直连、回国、去广告、`router-mode`、固定节点、全局模式、坏配置被拒绝、新配置自动重启、GitHub 不可达时继续运行。需要 Docker 和外网，不改动本机网络。
+用 Docker 在一个隔离的测试网络（198.51.100.0/24）里跑 `compose.yaml`：两个假机场节点、一台把旁路由当网关的客户端，检查 DNS、直连、回国、去广告、`router-mode`、固定节点、全局模式、坏配置被拒绝、新配置自动重启、GitHub 不可达时继续运行。需要 Docker 和外网，不改动本机网络。

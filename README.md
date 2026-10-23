@@ -76,14 +76,17 @@
 
 ## 回国节点组
 
-- 类型是 `url-test`，300 秒检测一次，延迟差 50 ms 以内不切换，只在被用到时检测（`lazy`）。
-- 健康检查用 `https://wifi.vivo.com.cn/generate_204`，要求返回 204。回国节点从中国大陆出口，用境外检测地址测到的是再次出境的链路；返回 204 以外的状态（劫持页、登录页）都算失败。
+- 类型是 `url-test`，60 秒检测一遍全部节点，延迟差 300 ms 以内不切换，只在被用到时检测（`lazy`）。300 ms 是按一天的 EdNovas 检测数据定的：门槛 50 ms 时一天约换 18 次节点，300 ms 时约 10 次，多出来的平均延迟只有 14 ms。每次换节点都会换出口 IP，而这点延迟差对接口和听歌没有影响。
+- 健康检查用 `http://wifi.vivo.com.cn/generate_204`，要求返回 204。回国节点从中国大陆出口，用境外检测地址测到的是再次出境的链路；返回 204 以外的状态（劫持页、登录页）都算失败。用 HTTP 是因为每次检测都算回国流量（EdNovas 按 5 倍计），HTTPS 的握手一次约 7 KB，HTTP 约 0.4 KB。
 - 成员是机场的全部节点，去掉公告和流量节点（“剩余流量”“到期”“官网”“群”等），去掉 `direct`、`dns` 这类不转发的节点。provider 里的节点在运行时用 `exclude-filter`、`exclude-type` 去掉（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/adapter/outboundgroup/groupbase.go#L200-L228)）。
 - 机场同时卖出国和回国节点时，只用名字里带 `🇨🇳`、`回国`、`大陆` 或 `内地` 的节点（例如 `🇨🇳 北京`、`上海 香港中转 🇨🇳`、`港广专线_回国`）。一个都没有时，全部节点都算回国节点，适用于名字里看不出方向的纯回国机场。只对内联节点生效；provider 里的节点在脚本运行时还不知道名字，混合机场的 provider 要在旁路由配置里单独加 `filter`。
 - **前提：用到的节点都从中国大陆出口。** 名字里没有这些标记、又混着香港或日本节点的机场不适用。名字里的 `香港` 不算出境标记：`上海 香港中转` 是从上海出口。
 - 链式代理的前置跳板（节点 `dialer-proxy` 指向的节点或组）不进组：跳板组列出的节点、它 `use` 的 provider 都按跳板处理。provider 自己或它的 `override` 带 `dialer-proxy` 时，它的节点全部是出口。脚本不计算跳板组的 `filter`；跳板组用 `include-all-proxies` 时所有内联节点都按跳板处理，若因此一个出口都不剩，就把全部节点放回来。这时组里可能混进中转节点，用 `tools/check-profile.mjs` 可以看核心实际给出的成员。
 - 订阅过期、只剩公告节点时，组里只剩 `DIRECT`，必须回国的服务暂时直连。
-- 规则实际指向隐藏的 `回国或直连`（`fallback` 类型，成员是 `回国节点` 和 `DIRECT`）：`回国节点` 通过健康检查时用它，整组都不通时用 `DIRECT`。启动时和连续几次连接失败时会立刻检查，使用中每 60 秒检查一次，10 秒内没有回应才算不通（国内白天线路偶尔超过 5 秒，慢一点比切到直连好），节点恢复后自动切回（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/adapter/outboundgroup/fallback.go)）。检测地址从海外直连也能访问，所以 `DIRECT` 总是可用的退路。它在代理页面和 FlClash 的规则模式下都不显示。
+- 规则实际指向隐藏的 `回国或直连`（`fallback` 类型），成员依次是 `回国节点`、每一个回国节点，最后是 `DIRECT`。它用第一个通过最近一次检测的成员：平时是 `回国节点`（最快的节点）；`回国节点` 正在用的节点没通过检测时，用下一个通过的节点；所有节点都没通过时才用 `DIRECT`。`fallback` 检测一个组时，走的是那个组当前用的节点，所以只放 `回国节点` 和 `DIRECT` 的话，一个节点偶尔超时就会把全部回国流量甩到直连（2026-10-22 的 EdNovas 数据：单次检测失败率约 3%，其中 84% 是只出现一次的偶发失败，一天里没有一次 14 个节点同时失败）。
+- 组里直接写的成员排在订阅源（provider）的节点前面（[源码](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/adapter/outboundgroup/parser.go)），所以机场节点来自 provider 时，`DIRECT` 由脚本加的一个只含直连出口的 `inline` provider（`回国直连`）提供，排在机场 provider 后面。这个组的 `exclude-type` 不排除 `Direct`；机场 provider 里如果混有 `direct` 类型的节点，会在它前面被选中。
+- 两个组都是 60 秒检测一次，检测超时用默认的 5 秒：一天里成功的检测最慢 2.1 秒。provider 里的节点按 provider 自己的健康检查检测；它没开健康检查时，按第一个登记它的组的间隔（[源码](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/adapter/provider/healthcheck.go)），机场自己的组可能先登记、间隔更长。旁路由给订阅源配了自己的 60 秒健康检查，不受这个影响。内联节点会被两个组各测一次，结果共用。
+- 机场的组用了 `include-all` 或 `include-all-providers` 时，Mihomo 会把所有 provider 都给它，包括 `回国直连`。脚本把这些组改成按同样顺序列出机场自己的 provider，免得 DNS、链式代理经过的机场组也拿到直连。启动时和连续几次连接失败时会立刻检查，使用中每 60 秒检查一次，节点恢复后自动切回（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/adapter/outboundgroup/fallback.go)）。检测地址从海外直连也能访问，所以 `DIRECT` 总是可用的退路。它在代理页面和 FlClash 的规则模式下都不显示。
 - 机场原有的组全部保留但隐藏：节点的 `dialer-proxy`、`tunnels`、DNS 的 `#组名` 可能引用它们，缺失会让核心拒绝整份配置（[源码](https://github.com/chen08209/Clash.Meta/blob/8380d0e7462f061a964323e9bf3129a236fcc5d5/config/utils.go#L148-L176)）。DNS 和 sniffer 引用的机场规则集也会保留。
 - 机场已有同名的节点或组时，脚本的组自动加后缀，例如 `回国节点 2`。机场配置自带 select 类型的 `GLOBAL` 时，脚本不另建，而是把 `回国节点` 放进它的第一位。
 
