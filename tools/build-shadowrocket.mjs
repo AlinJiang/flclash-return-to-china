@@ -5,7 +5,9 @@
 // both in the background (see shadowrocket/README.md).
 //
 // The rules are override.js's routing plan in the same order, pointed at the
-// Surge-format copies of the same lists. What Shadowrocket cannot express:
+// Surge-format copies of the same lists: Sukka publishes them, and the v2fly
+// geosite lists are converted daily onto the shadowrocket-lists branch
+// (tools/build-shadowrocket-lists.mjs). What Shadowrocket cannot express:
 // - own-unblock cannot exempt hosts from the reject lists. Its lines come
 //   first instead, going wherever return.txt or DIRECT would send them.
 // - Rules cannot nest a rule set, so the guard that rejects QUIC for return
@@ -28,6 +30,8 @@ const SUKKA_BASE = scriptValue('SUKKA_BASE');
 const SUKKA_SURGE_BASE = SUKKA_BASE.replace(/\/Clash\/$/, '/List/');
 const GEOSITE_BASE = scriptValue('GEOSITE_BASE');
 const OWN_BASE = scriptValue('SETTINGS.ownRulesBase');
+// The branch the shadowrocket-lists workflow publishes the converted geosite lists to.
+export const LISTS_BASE = OWN_BASE.replace(/\/main\/rules\/$/, '/shadowrocket-lists/');
 export const RETURN_GROUP = scriptValue('RETURN_GROUP');
 export const FALLBACK_GROUP = scriptValue('FALLBACK_GROUP');
 export const BACKUP_GROUP = '回国备用';
@@ -46,8 +50,7 @@ export function shadowrocketList(url) {
     return { type: file.startsWith('domainset/') ? 'DOMAIN-SET' : 'RULE-SET', url: `${SUKKA_SURGE_BASE}${file}` };
   }
   if (url.startsWith(GEOSITE_BASE)) {
-    // meta-rules-dat publishes each geosite list as text next to the MRS file.
-    return { type: 'DOMAIN-SET', url: url.replace(/\.mrs$/, '.list') };
+    return { type: 'RULE-SET', url: `${LISTS_BASE}geosite/${url.slice(GEOSITE_BASE.length).replace(/\.mrs$/, '.list')}` };
   }
   if (url.startsWith(OWN_BASE)) {
     return { type: 'RULE-SET', url };

@@ -1,0 +1,54 @@
+name: Publish Shadowrocket lists
+
+# Shadowrocket cannot read meta-rules-dat's Clash-format geosite lists, so this
+# converts the ones override.js uses and publishes them on the
+# shadowrocket-lists branch, which shadowrocket/return-to-china.conf points at.
+# meta-rules-dat rebuilds daily; so does this.
+on:
+  schedule:
+    - cron: '47 4 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - override.js
+      - tools/build-shadowrocket-lists.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shadowrocket-lists
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Convert the lists
+        run: node tools/build-shadowrocket-lists.mjs "$RUNNER_TEMP/lists"
+      # A fresh repository with one commit, force-pushed: the branch keeps no
+      # history. The token reaches git through a credential helper, never the
+      # checkout, so npm ci above ran without it.
+      - name: Publish them as a single commit on shadowrocket-lists
+        env:
+          GIT_USER: x-access-token
+          GIT_TOKEN: ${{ github.token }}
+        run: |
+          cd "$RUNNER_TEMP/lists"
+          printf '%s\n' 'Generated daily by .github/workflows/shadowrocket-lists.yml from meta-rules-dat; do not edit.' > README.md
+          git init -q -b shadowrocket-lists
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "Shadowrocket lists from meta-rules-dat, $(date -u +%Y-%m-%d)"
+          git -c credential.helper='!f() { echo "username=$GIT_USER"; echo "password=$GIT_TOKEN"; }; f' \
+            push -q --force "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" shadowrocket-lists
