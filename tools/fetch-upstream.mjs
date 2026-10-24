@@ -12,7 +12,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { runInNode, scriptValue } from '../test/support/flclash-runtime.mjs';
 import { subconverterProfile } from '../test/fixtures/profiles.mjs';
-import { buildShadowrocketConfig, remoteLists } from './build-shadowrocket.mjs';
+import { LISTS_BASE, buildShadowrocketConfig, remoteLists } from './build-shadowrocket.mjs';
+import { toRuleSet } from './build-shadowrocket-lists.mjs';
 
 const [geositeDirectory, sukkaDirectory] = process.argv.slice(2);
 if (!geositeDirectory || !sukkaDirectory) {
@@ -110,13 +111,18 @@ for (const [name, { url }] of providers) {
   }
 }
 
-// The Surge-format copies the Shadowrocket config names instead.
+// The Surge-format copies the Shadowrocket config names instead. The converted
+// geosite lists are checked at their source, and converted, here; the branch
+// that serves them is published by the shadowrocket-lists workflow.
 for (const { type, url } of remoteLists(buildShadowrocketConfig())) {
   if (url.startsWith(OWN_BASE)) {
     continue;
   }
+  const source = url.startsWith(LISTS_BASE) ? `${GEOSITE_BASE}${url.slice(`${LISTS_BASE}geosite/`.length)}` : url;
   try {
-    console.log(`ok   shadowrocket ${type} ${url.split('/').slice(-2).join('/')}: ${checkText(await download(url))}`);
+    const body = await download(source);
+    const summary = source === url ? checkText(body) : `${toRuleSet(body.toString('utf8')).split('\n').length - 1} rules`;
+    console.log(`ok   shadowrocket ${type} ${url.split('/').slice(-2).join('/')}: ${summary}`);
   } catch (error) {
     failures.push(`shadowrocket: ${url}: ${error.message}`);
     console.log(`FAIL shadowrocket ${url}: ${error.message}`);

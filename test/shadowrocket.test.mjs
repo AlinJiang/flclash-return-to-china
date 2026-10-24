@@ -9,8 +9,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  BACKUP_GROUP, FALLBACK_GROUP, RETURN_GROUP, buildShadowrocketConfig, remoteLists, shadowrocketConfigPath, shadowrocketList,
+  BACKUP_GROUP, FALLBACK_GROUP, LISTS_BASE, RETURN_GROUP, buildShadowrocketConfig, remoteLists, shadowrocketConfigPath, shadowrocketList,
 } from '../tools/build-shadowrocket.mjs';
+import { geositeFiles, toRuleSet } from '../tools/build-shadowrocket-lists.mjs';
 import { runInNode, scriptValue } from './support/flclash-runtime.mjs';
 import { subconverterProfile } from './fixtures/profiles.mjs';
 
@@ -37,9 +38,9 @@ test('the rules follow override.js\'s plan, in order, on the Surge-format copies
   const remote = rules.filter((rule) => /^(RULE-SET|DOMAIN-SET),/.test(rule)).map((rule) => [rule.split(',')[1], target(rule)]);
   assert.deepEqual(remote, expected);
   assert.equal(rules.at(-1), 'FINAL,DIRECT');
-  // Every list type matches its content: domain sets hold bare names, rule sets typed rules.
+  // Every list type matches its content: Sukka's domain sets hold bare names, the rest typed rules.
   for (const { type, url } of remoteLists(text)) {
-    assert.equal(type, /\/domainset\/|meta-rules-dat/.test(url) ? 'DOMAIN-SET' : 'RULE-SET', url);
+    assert.equal(type, url.includes('/domainset/') ? 'DOMAIN-SET' : 'RULE-SET', url);
   }
 });
 
@@ -64,4 +65,13 @@ test('the groups pick mainland nodes and check them as 回国节点 does, then f
     `${BACKUP_GROUP} = fallback,policy-regex-filter=${filter},${check},hidden=1`,
     `${FALLBACK_GROUP} = fallback,${RETURN_GROUP},${BACKUP_GROUP},DIRECT,${check},hidden=1`,
   ]);
+});
+
+test('geosite lists become Shadowrocket rule sets, and a line the converter cannot place fails it', () => {
+  assert.equal(toRuleSet('# comment\n+.bilibili.com\nbilibili.tv\n\n'), 'DOMAIN-SUFFIX,bilibili.com\nDOMAIN,bilibili.tv\n');
+  assert.throws(() => toRuleSet('regexp:^ad\\.'), /no Shadowrocket rule/);
+  assert.throws(() => toRuleSet('# only a comment\n'), /empty/);
+  // Every geosite list in the plan is converted and served from the lists branch.
+  const served = remoteLists(text).filter(({ url }) => url.startsWith(LISTS_BASE)).map(({ url }) => url.slice(`${LISTS_BASE}geosite/`.length));
+  assert.deepEqual(served, geositeFiles().map((file) => `${file}.list`));
 });

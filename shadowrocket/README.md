@@ -1,6 +1,6 @@
 # iPhone：Shadowrocket
 
-iOS 没有 FlClash，Shadowrocket 也不能运行 `override.js`。这里的 `return-to-china.conf` 由 `tools/build-shadowrocket.mjs` 从 `override.js` 生成：同一套分流规则、同样的顺序，规则集换成同一批列表的 Surge 格式版本。节点来自 Shadowrocket 里你自己添加的订阅，这份配置不含任何机密。
+iOS 没有 FlClash，Shadowrocket 也不能运行 `override.js`。这里的 `return-to-china.conf` 由 `tools/build-shadowrocket.mjs` 从 `override.js` 生成：同一套分流规则、同样的顺序，规则集换成同一批列表的 Surge 格式版本。Sukka 自己发布 Surge 格式；v2fly 的列表 meta-rules-dat 只有 Clash 格式（`+.域名`），Shadowrocket 读不懂，所以由 GitHub Actions 每天转换一次，发布在本仓库的 `shadowrocket-lists` 分支上（`tools/build-shadowrocket-lists.mjs`）。节点来自 Shadowrocket 里你自己添加的订阅，这份配置不含任何机密。
 
 在家连 Wi-Fi 时旁路由已经在分流，Shadowrocket 可以关掉；出门用流量时再打开。
 
@@ -35,11 +35,11 @@ iOS 没有 FlClash，Shadowrocket 也不能运行 `override.js`。这里的 `ret
 
 再看首页的代理分组：`回国节点` 里应该只有 🇨🇳 节点。
 
-`www.bilibili.tv` 没有命中 `DIRECT`、`api.bilibili.com` 没有命中 `回国或直连` 的话，说明 Shadowrocket 读不懂 v2fly 列表的 `+.` 写法，告诉我改用别的格式。
+`api.bilibili.com` 落到 `FINAL` 的话，说明 v2fly 的列表没下载到：配置 → 编辑配置 → 规则集 URL 里看哪几个是 ❎。
 
 ## 和 FlClash、旁路由的差别
 
-- **更新频率**：配置和规则集最快每天更新一次，FlClash 和旁路由上我们的规则每小时、上游列表每天。
+- **更新频率**：配置和规则集最快每天更新一次，FlClash 和旁路由上我们的规则每小时、上游列表每天。v2fly 列表本身先经 `shadowrocket-lists` 分支转换一次，那里每天 UTC 04:47 更新。
 - **放行例外**：Shadowrocket 不能让 `unblock.txt` 的域名"跳过"去广告规则继续往下匹配，所以这些行放在最前面，直接去 `return.txt` 或 `DIRECT` 会送它们去的地方。
 - **QUIC**：规则里不能嵌套规则集，没有"节点不支持 UDP 时拒绝回国 QUIC"那条保护。EdNovas 的节点都支持 UDP，影响不大。
 - **兜底顺序**：`回国或直连` 依次是 `回国节点`、`回国备用`（第一个通过检测的节点）、`DIRECT`，不像 FlClash 那样逐个节点列出，所以当前节点刚好出问题时，偶尔会短暂直连。
