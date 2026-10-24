@@ -34,6 +34,8 @@
 
 家里的电视、游戏机和没装 FlClash 的设备，可以通过 NAS 上的旁路由使用同一套分流，见 [`router/README.md`](router/README.md)。它的配置 `router/config.yaml` 由 `override.js` 生成，规则和 FlClash 设备完全一样。
 
+iPhone 没有 FlClash，出门时用 Shadowrocket：[`shadowrocket/README.md`](shadowrocket/README.md)。它的配置同样由 `override.js` 生成，少数 Shadowrocket 表达不了的地方在那里说明。
+
 ## 名单从哪里来
 
 名单几乎全部来自社区持续维护的规则集，由每台设备上的核心自动下载和更新：
@@ -218,6 +220,7 @@ MIHOMO_BIN=/tmp/mihomo ROUTE_PROBE_BIN=/tmp/route-probe MIHOMO_GEODATA_DIR=/tmp/
 - `test/`：测试。`fixtures/profiles.mjs` 是虚构的机场配置，`route-probe/` 是基于固定核心的路由探针。
 - `tools/check-profile.mjs`：用本地真实配置做离线检查。`tools/fetch-upstream.mjs`：下载并检查脚本用到的全部上游列表。
 - `router/`：NAS 旁路由的生成配置、Container Station 应用配置、部署说明和切换模式的 `router-mode`。`tools/build-router-config.mjs`：生成 `router/config.yaml`。
+- `shadowrocket/`：iPhone 用的 Shadowrocket 配置和设置说明。`tools/build-shadowrocket.mjs`：生成 `shadowrocket/return-to-china.conf`。
 - `.github/workflows/test.yml`：CI。
 
 ## 致谢和许可
