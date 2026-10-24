@@ -12,6 +12,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { runInNode, scriptValue } from '../test/support/flclash-runtime.mjs';
 import { subconverterProfile } from '../test/fixtures/profiles.mjs';
+import { buildShadowrocketConfig, remoteLists } from './build-shadowrocket.mjs';
 
 const [geositeDirectory, sukkaDirectory] = process.argv.slice(2);
 if (!geositeDirectory || !sukkaDirectory) {
@@ -106,6 +107,19 @@ for (const [name, { url }] of providers) {
   } catch (error) {
     failures.push(`${name}: ${url}: ${error.message}`);
     console.log(`FAIL ${name}: ${error.message}`);
+  }
+}
+
+// The Surge-format copies the Shadowrocket config names instead.
+for (const { type, url } of remoteLists(buildShadowrocketConfig())) {
+  if (url.startsWith(OWN_BASE)) {
+    continue;
+  }
+  try {
+    console.log(`ok   shadowrocket ${type} ${url.split('/').slice(-2).join('/')}: ${checkText(await download(url))}`);
+  } catch (error) {
+    failures.push(`shadowrocket: ${url}: ${error.message}`);
+    console.log(`FAIL shadowrocket ${url}: ${error.message}`);
   }
 }
 
