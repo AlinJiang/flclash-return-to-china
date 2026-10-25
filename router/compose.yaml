@@ -89,8 +89,8 @@ networks:
   lan:
     driver: macvlan
     driver_opts:
-      # Adapter 2, the NAS port with the cable. Through Adapter 1 (eth0) the same
-      # cable dropped about half of all packets while its link stayed up, which made
+      # Adapter 2, the NAS port with the cable. Adapter 1 (eth0), on another router
+      # port, dropped about half of all packets while its link stayed up, which made
       # voice calls choppy.
       parent: eth1
     ipam:
