@@ -5,3 +5,9 @@
 DOMAIN,vd.l.qq.com
 DOMAIN,vd6.l.qq.com
 DOMAIN,vi.l.qq.com
+
+# B 站 App 的 PCDN：官方视频 CDN（upos-*.bilivideo.com）会把 App 的请求 302 跳到这些节点，
+# Sukka 把它们列进了 reject，拦掉后 iPhone 上的视频完全加载不出来。放行后按 bilibili-cdn 或兜底规则直连。
+DOMAIN-SUFFIX,mcdn.bilivideo.cn
+DOMAIN-SUFFIX,mountaintoys.cn
+DOMAIN-SUFFIX,yirujs.com
