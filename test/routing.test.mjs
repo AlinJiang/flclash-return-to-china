@@ -59,6 +59,10 @@ const ROUTES = [
   ['tcp', 'm801.music.126.net', 443, 'DIRECT'],
   ['tcp', 'aqqmusic.tc.qq.com', 443, 'DIRECT'],
   ['tcp', 'sjy6.stream.qqmusic.qq.com', 443, 'DIRECT'],
+  // Bilibili's PCDN, where its CDN redirects the iOS app; Sukka rejects it, unblock.txt lets it through.
+  ['tcp', 'xy42x101x58x185xy.mcdn.bilivideo.cn', 8082, 'DIRECT'],
+  ['tcp', 'b-bacb4fc51cs41d5p0dxdau053w.edge.mountaintoys.cn', 4483, 'DIRECT'],
+  ['tcp', 'zz13.yirujs.com', 443, 'DIRECT'],
   // Overseas editions and overseas subsidiaries stay local.
   ['tcp', 'www.bilibili.tv', 443, 'DIRECT'],
   ['tcp', 'www.iq.com', 443, 'DIRECT'],
