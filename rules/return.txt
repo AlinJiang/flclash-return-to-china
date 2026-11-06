@@ -12,6 +12,9 @@ DOMAIN,vi.l.qq.com
 # 微信聊天里的图片、视频和文件：直连时解析到腾讯海外节点，2026-10-22 国内联系人发的媒体打不开
 # （一台设备 40 秒里连了 15 次，只收到 65 KB）。走回国从国内节点取；微信其他服务仍然直连。
 DOMAIN,c2c.cdn.weixin.qq.com
+# 国际版域名，iPhone 上的微信也用它取语音和图片：2026-11-06 直连时语音消息加载不出来
+# （2 分钟里连了 5 次，每次只收到 3 到 4 KB）。
+DOMAIN,c2c.cdn.wechat.com
 
 # 网易云音乐：客户端也经 163jiasu 别名调用接口。Sukka 在 Surge 里靠 USER-AGENT 规则覆盖，Clash 版没有这条。
 DOMAIN-SUFFIX,music.163.com.163jiasu.com

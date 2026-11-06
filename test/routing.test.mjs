@@ -39,6 +39,7 @@ const ROUTES = [
   ['tcp', 'vi.l.qq.com', 443, '回国或直连'],
   // WeChat chat media from mainland contacts; WeChat itself stays local.
   ['tcp', 'c2c.cdn.weixin.qq.com', 443, '回国或直连'],
+  ['tcp', 'c2c.cdn.wechat.com', 443, '回国或直连'],
   // Needs a China IP for other reasons.
   ['tcp', 'h5api.m.taobao.com', 443, '回国或直连'],
   ['tcp', 'www.zj.gov.cn', 443, '回国或直连'],
