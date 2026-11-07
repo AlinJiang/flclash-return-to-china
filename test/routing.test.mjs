@@ -64,6 +64,7 @@ const ROUTES = [
   ['tcp', 'xy42x101x58x185xy.mcdn.bilivideo.cn', 8082, 'DIRECT'],
   ['tcp', 'b-bacb4fc51cs41d5p0dxdau053w.edge.mountaintoys.cn', 4483, 'DIRECT'],
   ['tcp', 'zz13.yirujs.com', 443, 'DIRECT'],
+  ['tcp', 'v1d.szbdyd.com', 8082, 'DIRECT'],
   // Overseas editions and overseas subsidiaries stay local.
   ['tcp', 'www.bilibili.tv', 443, 'DIRECT'],
   ['tcp', 'www.iq.com', 443, 'DIRECT'],

@@ -11,3 +11,5 @@ DOMAIN,vi.l.qq.com
 DOMAIN-SUFFIX,mcdn.bilivideo.cn
 DOMAIN-SUFFIX,mountaintoys.cn
 DOMAIN-SUFFIX,yirujs.com
+# 同一类 PCDN，2026-11-07 的 6 个视频里还没出现，提前放行，免得 App 被跳到这里时又卡住。
+DOMAIN-SUFFIX,szbdyd.com
